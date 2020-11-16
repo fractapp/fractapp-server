@@ -1,0 +1,15 @@
+{
+  "ProjectId": "",
+  "WithCredentialsFile": "",
+  "SubstrateUrls": {
+    "Polkadot": "",
+    "Kusama": ""
+  },
+  "DB": {
+    "Host": "",
+    "User": "",
+    "Password": "",
+    "Database": ""
+  }
+}
+
