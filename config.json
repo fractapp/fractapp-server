@@ -1,9 +1,16 @@
 {
-  "ProjectId": "",
-  "WithCredentialsFile": "",
   "SubstrateUrls": {
     "Polkadot": "",
     "Kusama": ""
+  },
+  "Firebase": {
+    "ProjectId": "",
+    "WithCredentialsFile": ""
+  },
+  "SMSService": {
+    "FromNumber": "",
+    "AccountSid": "",
+    "AuthToken": ""
   },
   "DB": {
     "Host": "",

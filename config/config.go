@@ -6,10 +6,19 @@ import (
 )
 
 type Config struct {
-	SubstrateUrls       map[string]string
+	SubstrateUrls map[string]string
+	SMSService    SMSService
+	Firebase      Firebase
+	DB            DB
+}
+type SMSService struct {
+	FromNumber string
+	AccountSid string
+	AuthToken  string
+}
+type Firebase struct {
 	ProjectId           string
 	WithCredentialsFile string
-	DB                  DB
 }
 type DB struct {
 	Host     string

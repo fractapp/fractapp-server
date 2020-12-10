@@ -73,7 +73,13 @@ func start(ctx context.Context) error {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	nController := controller.NewNotificationController(database)
+	pController := controller.NewProfileController(database,
+		config.SMSService.FromNumber,
+		config.SMSService.AccountSid,
+		config.SMSService.AuthToken,
+	)
 	r.Post("/subscribe", nController.Subscribe)
+	r.Post("/registration", pController.Registration)
 
 	srv := &http.Server{
 		Addr:    host,
@@ -90,7 +96,7 @@ func start(ctx context.Context) error {
 
 	log.Printf("http: Server listen: %s", host)
 
-	n, err := notificator.NewFirebaseNotificator(ctx, config.WithCredentialsFile, config.ProjectId)
+	n, err := notificator.NewFirebaseNotificator(ctx, config.Firebase.WithCredentialsFile, config.Firebase.ProjectId)
 	if err != nil {
 		return err
 	}
@@ -100,7 +106,7 @@ func start(ctx context.Context) error {
 		go func() {
 			err = es.Start()
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("%s scanner down: %s \n", network.String(), err)
 			}
 		}()
 		log.Printf("Event scanner for %s started \n", k)

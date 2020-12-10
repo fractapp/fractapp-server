@@ -13,8 +13,6 @@ import (
 
 	"github.com/ChainSafe/go-schnorrkel"
 
-	"github.com/tendermint/tendermint/crypto/sr25519"
-
 	"github.com/go-pg/pg/v10"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -53,13 +51,15 @@ func NewNotificationController(db *pg.DB) *NotificationController {
 }
 
 func (controller *NotificationController) Subscribe(w http.ResponseWriter, r *http.Request) {
-	if err := controller.subscribe(w, r); err != nil {
+	if err := controller.subscribe(r); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Http error: %s \n", err.Error())
+		return
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
-func (controller *NotificationController) subscribe(w http.ResponseWriter, r *http.Request) error {
+func (controller *NotificationController) subscribe(r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func (controller *NotificationController) subscribe(w http.ResponseWriter, r *ht
 	if err != nil {
 		return err
 	}
-	pubKey := sr25519.PubKeySr25519{}
+	pubKey := [32]byte{}
 	copy(pubKey[:], pubKeyBytes)
 
 	signBytes, err := hexutil.Decode(updateTokenRq.Sign)
@@ -153,6 +153,5 @@ func (controller *NotificationController) subscribe(w http.ResponseWriter, r *ht
 		return err
 	}
 
-	w.WriteHeader(http.StatusOK)
 	return nil
 }
