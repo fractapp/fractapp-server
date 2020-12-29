@@ -13,7 +13,7 @@ func init() {
 		_, err := db.Exec(`create table subscribers
 (
     "address"    varchar(50) not null
-        constraint address_pk
+        constraint subscriber_address_pk
             primary key,
     "token"      varchar,
     "network"   integer

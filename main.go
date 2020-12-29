@@ -7,7 +7,9 @@ import (
 	"flag"
 	"fmt"
 	"fractapp-server/config"
-	"fractapp-server/controller"
+	internalMiddleware "fractapp-server/controller/middleware"
+	"fractapp-server/controller/notification"
+	"fractapp-server/controller/profile"
 	"fractapp-server/notificator"
 	"fractapp-server/scanner"
 	"fractapp-server/types"
@@ -69,17 +71,25 @@ func start(ctx context.Context) error {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(internalMiddleware.PubKeyAuth)
 
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	nController := controller.NewNotificationController(database)
-	pController := controller.NewProfileController(database,
+	nController := notification.NewController(database)
+	pController := profile.NewController(
+		database,
 		config.SMSService.FromNumber,
 		config.SMSService.AccountSid,
 		config.SMSService.AuthToken,
 	)
-	r.Post("/subscribe", nController.Subscribe)
-	r.Post("/registration", pController.Registration)
+
+	r.Post("/notification/subscribe", nController.Subscribe)
+	r.With(internalMiddleware.PubKeyAuth).Route("/profile", func(r chi.Router) {
+		r.Post(string(profile.Auth), pController.Route(profile.Auth))
+		r.Post(string(profile.ConfirmAuth), pController.Route(profile.ConfirmAuth))
+		r.Post(string(profile.UpdateProfile), pController.Route(profile.UpdateProfile))
+		r.Get(string(profile.Username), pController.Route(profile.Username))
+	})
 
 	srv := &http.Server{
 		Addr:    host,

@@ -16,6 +16,7 @@ func init() {
         constraint phone_number_pk
             primary key,
     "code"      varchar(6) not null,
+ 	"attempts"   integer,
     "count"   integer,
  	"timestamp"   integer
 );`)
