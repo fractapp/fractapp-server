@@ -27,7 +27,8 @@ func init() {
             unique,
  	"twitter"   varchar(15)
 		constraint twitter_pk
-            unique
+            unique,
+	"is_migratory" boolean
 );`)
 		return err
 	}, func(db migrations.DB) error {

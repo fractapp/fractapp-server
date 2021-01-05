@@ -11,13 +11,12 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/go-pg/pg/v10"
 )
 
 const (
 	MaxAddressesForToken = 10
 	SubscribeMsg         = "It is my firebase token for fractapp:"
+	SubscribeRoute       = "/subscribe"
 )
 
 var (
@@ -25,22 +24,28 @@ var (
 )
 
 type Controller struct {
-	db *pg.DB
+	db db.DB
 }
 
-func NewController(db *pg.DB) *Controller {
+func NewController(db db.DB) *Controller {
 	return &Controller{
 		db: db,
 	}
 }
 
-func (c *Controller) Subscribe(w http.ResponseWriter, r *http.Request) {
-	if err := c.subscribe(r); err != nil {
-		log.Printf("Http error: %s \n", err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+func (c *Controller) MainRoute() string {
+	return "/notification"
+}
+func (c *Controller) Handler(route string) (func(r *http.Request) error, error) {
+	switch route {
+	case SubscribeRoute:
+		return c.subscribe, nil
 	}
-	w.WriteHeader(http.StatusOK)
+
+	return nil, controller.InvalidRouteErr
+}
+func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 func (c *Controller) subscribe(r *http.Request) error {
@@ -76,36 +81,37 @@ func (c *Controller) subscribe(r *http.Request) error {
 		return err
 	}
 
-	addressCountByToken, err := c.db.Model(&db.Subscriber{}).
-		Where("token = ?", updateTokenRq.Token).Count()
-	if err != nil && err != pg.ErrNoRows {
+	subsCountByToken, err := c.db.SubscribersCountByToken(updateTokenRq.Token)
+	if err != nil && err != db.ErrNoRows {
 		return err
 	}
 
-	if addressCountByToken >= MaxAddressesForToken {
+	if subsCountByToken >= MaxAddressesForToken {
 		return MaxAddressCountByTokenErr
 	}
 
-	err = c.db.Model(&db.Subscriber{}).Where("address = ?", updateTokenRq.Address).Select()
-	if err != nil && err != pg.ErrNoRows {
+	sub, err := c.db.SubscriberByAddress(updateTokenRq.Address)
+	if err != nil && err != db.ErrNoRows {
 		return err
 	}
 
-	subscriber := &db.Subscriber{
-		Address: updateTokenRq.Address,
-		Token:   updateTokenRq.Token,
-		Network: updateTokenRq.Network,
+	if err == db.ErrNoRows {
+		sub = &db.Subscriber{
+			Address: updateTokenRq.Address,
+			Token:   updateTokenRq.Token,
+			Network: updateTokenRq.Network,
+		}
+	} else {
+		sub.Token = updateTokenRq.Token
 	}
-	if err == pg.ErrNoRows {
-		_, err = c.db.Model(subscriber).Insert()
+
+	if err == db.ErrNoRows {
+		err = c.db.Insert(sub)
 		if err != nil {
 			return err
 		}
 	} else {
-		_, err = c.db.Model(subscriber).
-			Column("token").
-			Where("address = ?", subscriber.Address).
-			Update()
+		err = c.db.UpdateByPK(sub)
 		if err != nil {
 			return err
 		}

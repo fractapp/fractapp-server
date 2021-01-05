@@ -14,4 +14,5 @@ var (
 	InvalidSignTimeErr = errors.New("invalid sign time")
 	InvalidAuthErr     = errors.New("invalid auth")
 	InvalidRqErr       = errors.New("invalid rq")
+	InvalidRouteErr    = errors.New("invalid route")
 )

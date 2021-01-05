@@ -17,7 +17,7 @@ func init() {
 			references profiles,
   	"address"    varchar(50) not null
         constraint address_pk
-            unique,
+            primary key,
     "network"   integer
 );`)
 		return err

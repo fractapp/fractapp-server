@@ -40,6 +40,9 @@ func PubKeyAuth(next http.Handler) http.Handler {
 	})
 }
 
+func AuthId(r *http.Request) string {
+	return r.Context().Value(AuthIdKey).(string)
+}
 func auth(r *http.Request) (string, error) {
 	strTimestamp := r.Header.Get(string(SignTimestamp))
 	hexPubKey := r.Header.Get(string(AuthPubKey))

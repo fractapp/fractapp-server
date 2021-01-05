@@ -18,7 +18,9 @@ func init() {
     "code"      varchar(6) not null,
  	"attempts"   integer,
     "count"   integer,
- 	"timestamp"   integer
+ 	"timestamp"   bigint,
+	"type"   integer,
+	"check_type"   integer
 );`)
 		return err
 	}, func(db migrations.DB) error {

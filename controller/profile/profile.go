@@ -10,6 +10,7 @@ import (
 	"fractapp-server/twilio"
 	"fractapp-server/types"
 	"fractapp-server/utils"
+	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -21,8 +22,6 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
-type Route string
-
 const (
 	SignAddressMsg   = "It is my auth key for fractapp:"
 	SMSMsg           = "Your code for Fractapp: %s"
@@ -31,21 +30,15 @@ const (
 	MaxSMSCount      = 5
 	MaxWrongCodeSend = 3
 
-	MaxUsernameLength = 30
-	MaxNameLength     = 40
-
-	//TODO take more symbols
-	InvalidSym = "@?.,&^%$#@!^&*()-+=:''`?.,"
-
-	Auth          Route = "auth"
-	ConfirmAuth   Route = "confirm"
-	UpdateProfile Route = "updateProfile"
-	Username      Route = "username"
+	AuthRoute          = "/auth"
+	ConfirmAuthRoute   = "/confirm"
+	UpdateProfileRoute = "/updateProfile"
+	UsernameRoute      = "/username"
 )
 
 var (
 	InvalidSendSMSTimeoutErr = errors.New("expect timeout for new SMS sending")
-	AccountExistErr          = errors.New("account exist")
+	InvalidSignInErr         = errors.New("invalid sign in")
 	AddressExistErr          = errors.New("address exist")
 	InvalidCodeErr           = errors.New("invalid confirm code")
 	InvalidNumberOfAttempts  = errors.New("invalid number of attempts")
@@ -56,42 +49,35 @@ var (
 )
 
 type Controller struct {
-	db     *pg.DB
+	db     db.DB
 	twilio *twilio.Api
 }
 
-func NewController(db *pg.DB, fromNumber string, accountSid string, authToken string) *Controller {
+func NewController(db db.DB, fromNumber string, accountSid string, authToken string) *Controller {
 	return &Controller{
 		db:     db,
 		twilio: twilio.NewApi(fromNumber, accountSid, authToken),
 	}
 }
 
-func (c *Controller) Route(route Route) func(w http.ResponseWriter, r *http.Request) {
-	var f func(r *http.Request) error
-	switch route {
-	case Auth:
-		f = c.auth
-	case ConfirmAuth:
-		f = c.confirmAuth
-	case UpdateProfile:
-		f = c.updateProfile
-	case Username:
-		f = c.findUsername
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := f(r); err != nil {
-			log.Printf("Http error: %s \n", err.Error())
-
-			c.returnErr(err, w)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}
+func (c *Controller) MainRoute() string {
+	return "/profile"
 }
+func (c *Controller) Handler(route string) (func(r *http.Request) error, error) {
+	switch route {
+	case AuthRoute:
+		return c.auth, nil
+	case ConfirmAuthRoute:
+		return c.confirmAuth, nil
+	case UpdateProfileRoute:
+		return c.updateProfile, nil
+	case UsernameRoute:
+		return c.findUsername, nil
+	}
 
-func (c *Controller) returnErr(err error, w http.ResponseWriter) {
+	return nil, controller.InvalidRouteErr
+}
+func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	switch err {
 	case twilio.InvalidPhoneNumberErr:
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -119,8 +105,7 @@ func (c *Controller) auth(r *http.Request) error {
 		code = fmt.Sprintf("%06s", code)
 	}
 
-	auth := &db.Auth{}
-	err := c.db.Model(auth).Where("phone_number = ?", phoneNumber).Select()
+	auth, err := c.db.AuthByPhoneNumber(phoneNumber)
 	if err != nil && err != pg.ErrNoRows {
 		return err
 	}
@@ -131,7 +116,8 @@ func (c *Controller) auth(r *http.Request) error {
 		auth = &db.Auth{
 			PhoneNumber: phoneNumber,
 			Code:        code,
-			Count:       0,
+			Type:        types.PhoneNumberCode,
+			CheckType:   types.Auth,
 		}
 	} else {
 		if now.Before(time.Unix(auth.Timestamp, 0).Add(SMSTimeout)) {
@@ -149,11 +135,12 @@ func (c *Controller) auth(r *http.Request) error {
 	auth.Count++
 
 	if err == pg.ErrNoRows {
-		_, err = c.db.Model(auth).Insert()
+		err = c.db.Insert(auth)
 	} else {
-		_, err = c.db.Model(auth).
-			Where("phone_number = ?", auth.PhoneNumber).
-			Update()
+		err = c.db.UpdateByPK(auth)
+	}
+	if err != nil {
+		return err
 	}
 
 	if err := c.twilio.SendSMS(phoneNumber, SMSMsg, code); err != nil {
@@ -168,15 +155,14 @@ func (c *Controller) confirmAuth(r *http.Request) error {
 		return err
 	}
 
-	id := r.Context().Value(middleware.AuthIdKey).(string)
-
-	exist, err := c.db.Model(&db.Profile{}).Where("id = ?", id).Exists()
+	id := middleware.AuthId(r)
+	profile, err := c.db.ProfileById(id)
 	if err != nil && err != pg.ErrNoRows {
 		return err
 	}
 
-	if exist {
-		return AccountExistErr
+	if c != nil && profile.Id != id {
+		return InvalidSignInErr
 	}
 
 	rq := ConfirmRegRq{}
@@ -217,7 +203,7 @@ func (c *Controller) confirmAuth(r *http.Request) error {
 			return err
 		}
 
-		addressExist, err := c.db.Model(&db.Address{}).Where("address = ?", v.Address).Exists()
+		addressExist, err := c.db.AddressIsExist(v.Address)
 		if err != nil {
 			return err
 		}
@@ -227,8 +213,7 @@ func (c *Controller) confirmAuth(r *http.Request) error {
 		}
 	}
 
-	auth := db.Auth{}
-	err = c.db.Model(&auth).Where("phoneNumber = ?", rq.PhoneNumber).Select()
+	auth, err := c.db.AuthByPhoneNumber(rq.PhoneNumber)
 	if err != nil {
 		return err
 	}
@@ -240,49 +225,41 @@ func (c *Controller) confirmAuth(r *http.Request) error {
 	if auth.Code != strconv.Itoa(rq.Code) {
 		auth.Attempts++
 
-		_, err := c.db.Model(&auth).Where("attempts = ?", auth.Attempts).Update()
-		if err != nil {
+		if err := c.db.UpdateByPK(auth); err != nil {
 			return err
 		}
 
 		return InvalidCodeErr
 	}
 
-	if err := c.db.RunInTransaction(r.Context(), func(tx *pg.Tx) error {
-		if _, err = c.db.Model(&db.Profile{
-			Id:          id,
-			PhoneNumber: rq.PhoneNumber,
-		}).Insert(); err != nil {
-			return err
-		}
+	var addresses []*db.Address
+	for _, v := range rq.Addresses {
+		addresses = append(addresses, &db.Address{
+			Id:      id,
+			Address: v.Address,
+			Network: v.Network,
+		})
+	}
 
-		for _, v := range rq.Addresses {
-			if _, err := c.db.Model(&db.Address{
-				Id:      id,
-				Address: v.Address,
-				Network: v.Network,
-			}).Insert(); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}); err != nil {
+	if err := c.db.CreateProfile(r.Context(), &db.Profile{
+		Id:          id,
+		PhoneNumber: rq.PhoneNumber,
+	}, addresses); err != nil {
 		return err
 	}
 
 	return nil
 }
+
 func (c *Controller) updateProfile(r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 
-	id := r.Context().Value(middleware.AuthIdKey).(string)
+	id := middleware.AuthId(r)
 
-	profile := &db.Profile{}
-	err = c.db.Model(profile).Where("id = ?", id).First()
+	profile, err := c.db.ProfileById(id)
 	if err != nil {
 		return err
 	}
@@ -306,14 +283,14 @@ func (c *Controller) updateProfile(r *http.Request) error {
 		profile.Username = rq.Username
 	}
 	if profile.Name != rq.Name {
-		if !isValidName(rq.Name) {
+		if !validators.IsValidName(rq.Name) {
 			return InvalidPropertyErr
 		}
 
 		profile.Name = rq.Name
 	}
 
-	_, err = c.db.Model(profile).Update()
+	err = c.db.UpdateByPK(profile)
 	if err != nil {
 		return err
 	}
@@ -332,44 +309,14 @@ func (c *Controller) findUsername(r *http.Request) error {
 	return UsernameNotFoundErr
 }
 func (c *Controller) usernameIsExist(username string) (bool, error) {
-	if !isValidUsername(username) {
+	if !validators.IsValidUsername(username) {
 		return false, InvalidPropertyErr
 	}
 
-	count, err := c.db.Model(&db.Profile{}).Where("username = ?", username).Count()
+	isExist, err := c.db.UsernameIsExist(username)
 	if err != nil {
 		return false, err
 	}
 
-	return count == 0, nil
-}
-
-//TODO transfer to any pkg
-func isValidUsername(username string) bool {
-	if len(username) > MaxUsernameLength {
-		return false
-	}
-
-	count := strings.Count(" ", username)
-	//TODO test
-	for _, v := range InvalidSym {
-		count += strings.Count(string(v), username)
-	}
-
-	return count == 0
-}
-
-//TODO  transfer to any pkg
-func isValidName(name string) bool {
-	if len(name) > MaxNameLength {
-		return false
-	}
-
-	var count int
-	//TODO test
-	for _, v := range InvalidSym {
-		count += strings.Count(string(v), name)
-	}
-
-	return count == 0
+	return isExist, nil
 }

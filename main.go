@@ -7,9 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"fractapp-server/config"
+	"fractapp-server/controller"
 	internalMiddleware "fractapp-server/controller/middleware"
 	"fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
+	"fractapp-server/db"
 	"fractapp-server/notificator"
 	"fractapp-server/scanner"
 	"fractapp-server/types"
@@ -71,24 +73,28 @@ func start(ctx context.Context) error {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(internalMiddleware.PubKeyAuth)
 
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	nController := notification.NewController(database)
+	pgDb := (*db.PgDB)(database)
+
+	nController := notification.NewController(pgDb)
 	pController := profile.NewController(
-		database,
+		pgDb,
 		config.SMSService.FromNumber,
 		config.SMSService.AccountSid,
 		config.SMSService.AuthToken,
 	)
 
-	r.Post("/notification/subscribe", nController.Subscribe)
-	r.With(internalMiddleware.PubKeyAuth).Route("/profile", func(r chi.Router) {
-		r.Post(string(profile.Auth), pController.Route(profile.Auth))
-		r.Post(string(profile.ConfirmAuth), pController.Route(profile.ConfirmAuth))
-		r.Post(string(profile.UpdateProfile), pController.Route(profile.UpdateProfile))
-		r.Get(string(profile.Username), pController.Route(profile.Username))
+	r.Route(nController.MainRoute(), func(r chi.Router) {
+		r.Post(notification.SubscribeRoute, controller.Route(nController, notification.SubscribeRoute))
+	})
+
+	r.With(internalMiddleware.PubKeyAuth).Route(pController.MainRoute(), func(r chi.Router) {
+		r.Post(profile.AuthRoute, controller.Route(pController, profile.AuthRoute))
+		r.Post(profile.ConfirmAuthRoute, controller.Route(pController, profile.ConfirmAuthRoute))
+		r.Post(profile.UpdateProfileRoute, controller.Route(pController, profile.UpdateProfileRoute))
+		r.Get(profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 	})
 
 	srv := &http.Server{
