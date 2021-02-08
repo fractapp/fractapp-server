@@ -5,9 +5,10 @@ import "math/big"
 type Currency int
 
 const (
-	accuracy          = 1000
-	DOT      Currency = iota
+	DOT Currency = iota
 	KSM
+
+	accuracy = 1000
 )
 
 func (c Currency) ConvertFromPlanck(amount *big.Int) float64 {

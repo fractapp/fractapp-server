@@ -10,20 +10,19 @@ import (
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client"
 	"github.com/centrifuge/go-substrate-rpc-client/types"
-	"github.com/go-pg/pg/v10"
 )
 
-const addressesLimit = 1000000
+const addressesLimit = 100000
 
 type EventScanner struct {
 	host        string
-	db          *pg.DB
+	db          db.DB
 	prefix      string
 	network     dbType.Network
 	notificator notificator.Notificator
 }
 
-func NewEventScanner(host string, db *pg.DB, prefix string, network dbType.Network, notificator notificator.Notificator) *EventScanner {
+func NewEventScanner(host string, db db.DB, prefix string, network dbType.Network, notificator notificator.Notificator) *EventScanner {
 	return &EventScanner{
 		host:        host,
 		db:          db,
@@ -126,7 +125,7 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 		receivers[receiver][sender].Add(receivers[receiver][sender], v.Value.Int)
 	}
 
-	addrCount, err := s.db.Model(new(db.Subscriber)).Count()
+	addrCount, err := s.db.SubscribersCount()
 	if err != nil {
 		return err
 	}
@@ -135,14 +134,13 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 		return nil
 	}
 
-	var subscribers []db.Subscriber
-
 	i := 0
 	for i < addrCount {
-		err := s.db.Model(&subscribers).Offset(i).Limit(addressesLimit).Select()
+		subscribers, err := s.db.SubscribersByRange(i, addressesLimit)
 		if err != nil {
 			return err
 		}
+
 		i += addressesLimit
 
 		for _, sub := range subscribers {
@@ -154,8 +152,19 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 			if senderExist {
 				for receiver, amount := range sentTxs {
 					currency := s.network.Currency()
-					msg := s.notificator.Msg(receiver, notificator.Sent, currency.ConvertFromPlanck(amount), currency)
-					err := s.notificator.Notify(msg, sub.Token)
+
+					name := receiver
+					p, err := s.db.ProfileByAddress(receiver)
+					if err != nil && err != db.ErrNoRows {
+						log.Printf("invalid get by address in notification service: %s\n", err.Error())
+						continue
+					}
+					if err != db.ErrNoRows {
+						name = p.Name
+					}
+
+					msg := s.notificator.Msg(name, notificator.Sent, currency.ConvertFromPlanck(amount), currency)
+					err = s.notificator.Notify(msg, sub.Token)
 
 					log.Printf("%s: Notify Type: Sent; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",
 						s.prefix, sub.Address, receiver, sub.Address, amount.String())
@@ -171,8 +180,18 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 				for sender, amount := range receivedTxs {
 					currency := s.network.Currency()
 
-					msg := s.notificator.Msg(sender, notificator.Received, currency.ConvertFromPlanck(amount), currency)
-					err := s.notificator.Notify(msg, sub.Token)
+					name := sender
+					p, err := s.db.ProfileByAddress(sender)
+					if err != nil && err != db.ErrNoRows {
+						log.Printf("invalid get by address in notification service: %s\n", err.Error())
+						continue
+					}
+					if err != db.ErrNoRows {
+						name = p.Name
+					}
+
+					msg := s.notificator.Msg(name, notificator.Received, currency.ConvertFromPlanck(amount), currency)
+					err = s.notificator.Notify(msg, sub.Token)
 
 					log.Printf("%s: Notify Type: Received; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",
 						s.prefix, sender, sub.Address, sub.Address, amount.String())

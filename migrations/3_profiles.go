@@ -25,10 +25,9 @@ func init() {
     "email"   varchar(256)
 		constraint email_pk
             unique,
- 	"twitter"   varchar(15)
-		constraint twitter_pk
-            unique,
-	"is_migratory" boolean
+	"is_migratory" boolean,
+	"avatar_ext" varchar(4),
+	"last_update"  bigint not null
 );`)
 		return err
 	}, func(db migrations.DB) error {

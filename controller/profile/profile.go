@@ -1,257 +1,237 @@
 package profile
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/controller/middleware"
 	"fractapp-server/db"
-	"fractapp-server/twilio"
 	"fractapp-server/types"
 	"fractapp-server/utils"
 	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
-	"strconv"
+	"os"
 	"strings"
 	"time"
-
-	"github.com/go-pg/pg/v10"
 )
 
 const (
-	SignAddressMsg   = "It is my auth key for fractapp:"
-	SMSMsg           = "Your code for Fractapp: %s"
-	SMSTimeout       = 1 * time.Minute
-	ResetCountSMS    = 1 * time.Hour
-	MaxSMSCount      = 5
-	MaxWrongCodeSend = 3
+	UpdateProfileRoute   = "/updateProfile"
+	UsernameRoute        = "/username"
+	UploadAvatarRoute    = "/uploadAvatar"
+	MyProfileRoute       = "/my"
+	SearchRoute          = "/search"
+	MyContactsRoute      = "/contacts"
+	UploadContactsRoute  = "/uploadContacts"
+	MyMatchContactsRoute = "/matchContacts"
+	ProfileInfoRoute     = "/info"
 
-	AuthRoute          = "/auth"
-	ConfirmAuthRoute   = "/confirm"
-	UpdateProfileRoute = "/updateProfile"
-	UsernameRoute      = "/username"
+	AvatarDir       = "/.avatars"
+	MaxAvatarSize   = 1 << 20
+	MaxUsersResult  = 10
+	MinSearchLength = 4
+
+	MaxContacts = 400
 )
 
 var (
-	InvalidSendSMSTimeoutErr = errors.New("expect timeout for new SMS sending")
-	InvalidSignInErr         = errors.New("invalid sign in")
-	AddressExistErr          = errors.New("address exist")
-	InvalidCodeErr           = errors.New("invalid confirm code")
-	InvalidNumberOfAttempts  = errors.New("invalid number of attempts")
-
-	UsernameIsExistErr  = errors.New("username is exist")
-	UsernameNotFoundErr = errors.New("username not found")
-	InvalidPropertyErr  = errors.New("property has invalid symbols or length")
+	InvalidFileFormatErr = errors.New("invalid file format")
+	InvalidFileSizeErr   = errors.New("invalid file size")
+	UsernameIsExistErr   = errors.New("username is exist")
+	UsernameNotFoundErr  = errors.New("username not found")
+	InvalidPropertyErr   = errors.New("property has invalid symbols or length")
 )
 
 type Controller struct {
-	db     db.DB
-	twilio *twilio.Api
+	db db.DB
 }
 
-func NewController(db db.DB, fromNumber string, accountSid string, authToken string) *Controller {
+func NewController(db db.DB) *Controller {
 	return &Controller{
-		db:     db,
-		twilio: twilio.NewApi(fromNumber, accountSid, authToken),
+		db: db,
 	}
 }
 
 func (c *Controller) MainRoute() string {
 	return "/profile"
 }
-func (c *Controller) Handler(route string) (func(r *http.Request) error, error) {
+func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.Request) error, error) {
 	switch route {
-	case AuthRoute:
-		return c.auth, nil
-	case ConfirmAuthRoute:
-		return c.confirmAuth, nil
+	case SearchRoute:
+		return c.search, nil
 	case UpdateProfileRoute:
 		return c.updateProfile, nil
 	case UsernameRoute:
 		return c.findUsername, nil
+	case UploadAvatarRoute:
+		return c.uploadAvatar, nil
+	case MyProfileRoute:
+		return c.myProfile, nil
+	case MyContactsRoute:
+		return c.myContacts, nil
+	case MyMatchContactsRoute:
+		return c.myMatchContacts, nil
+	case UploadContactsRoute:
+		return c.uploadMyContact, nil
+	case ProfileInfoRoute:
+		return c.profile, nil
 	}
 
 	return nil, controller.InvalidRouteErr
 }
 func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	switch err {
-	case twilio.InvalidPhoneNumberErr:
-		http.Error(w, err.Error(), http.StatusNotFound)
-	case InvalidSendSMSTimeoutErr:
-		http.Error(w, err.Error(), http.StatusAccepted)
 	case UsernameNotFoundErr:
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "", http.StatusBadRequest)
 	}
 }
 
-func (c *Controller) auth(r *http.Request) error {
-	phoneNumber := "+" + strings.ReplaceAll(r.URL.Query()["number"][0], " ", "")
-	log.Printf("Phone number: %s\n", phoneNumber)
+func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
+	value := r.URL.Query().Get("value")
+	value = strings.Trim(strings.ToLower(value), " ")
 
-	if err := c.twilio.ValidatePhoneNumber(phoneNumber); err != nil {
-		return err
-	}
+	searchType := r.URL.Query().Get("type")
 
-	generator := rand.New(rand.NewSource(time.Now().UnixNano()))
-	codeInt := generator.Intn(999999)
-	code := fmt.Sprintf("%d", codeInt)
-	if len(code) < 6 {
-		code = fmt.Sprintf("%06s", code)
-	}
-
-	auth, err := c.db.AuthByPhoneNumber(phoneNumber)
-	if err != nil && err != pg.ErrNoRows {
-		return err
-	}
-
-	now := time.Now()
-
-	if err == pg.ErrNoRows {
-		auth = &db.Auth{
-			PhoneNumber: phoneNumber,
-			Code:        code,
-			Type:        types.PhoneNumberCode,
-			CheckType:   types.Auth,
+	var users []UserProfileShort
+	if len(value) < MinSearchLength {
+		b, err := json.Marshal(&users)
+		if err != nil {
+			return err
 		}
+		w.Write(b)
+
+		return nil
+	}
+
+	var profiles []db.Profile
+	var err error
+	if searchType == "email" {
+		profile, err := c.db.SearchUsersByEmail(value)
+		if err != nil {
+			return err
+		}
+
+		profiles = append(profiles, *profile)
 	} else {
-		if now.Before(time.Unix(auth.Timestamp, 0).Add(SMSTimeout)) {
-			return InvalidSendSMSTimeoutErr
-		}
-		if now.Before(time.Unix(auth.Timestamp, 0).Add(ResetCountSMS)) && auth.Count >= MaxSMSCount {
-			return InvalidSendSMSTimeoutErr
+		profiles, err = c.db.SearchUsersByUsername(value, MaxUsersResult)
+		if err != nil {
+			return err
 		}
 	}
 
-	if now.After(time.Unix(auth.Timestamp, 0).Add(ResetCountSMS)) {
-		auth.Count = 0
-	}
-	auth.Timestamp = time.Now().Unix()
-	auth.Count++
+	for _, v := range profiles {
+		addresses, err := c.db.AddressesById(v.Id)
+		if err != nil {
+			continue
+		}
 
-	if err == pg.ErrNoRows {
-		err = c.db.Insert(auth)
-	} else {
-		err = c.db.UpdateByPK(auth)
+		user := UserProfileShort{
+			Id:         v.Id,
+			Name:       v.Name,
+			Username:   v.Username,
+			AvatarExt:  v.AvatarExt,
+			LastUpdate: v.LastUpdate,
+			Addresses:  make(map[types.Currency]string),
+		}
+
+		for _, v := range addresses {
+			user.Addresses[v.Network.Currency()] = v.Address
+		}
+
+		users = append(users, user)
 	}
+
+	b, err := json.Marshal(&users)
 	if err != nil {
 		return err
 	}
 
-	if err := c.twilio.SendSMS(phoneNumber, SMSMsg, code); err != nil {
-		return err
-	}
-
+	w.Write(b)
 	return nil
 }
-func (c *Controller) confirmAuth(r *http.Request) error {
-	b, err := ioutil.ReadAll(r.Body)
+func (c *Controller) profile(w http.ResponseWriter, r *http.Request) error {
+	id := r.URL.Query().Get("id")
+	id = strings.Trim(id, " ")
+
+	address := r.URL.Query().Get("address")
+	address = strings.Trim(address, " ")
+
+	var p *db.Profile
+	var err error
+	if id != "" {
+		p, err = c.db.ProfileById(id)
+	} else if address != "" {
+		p, err = c.db.ProfileByAddress(address)
+	} else {
+		return errors.New("invalid params")
+	}
 	if err != nil {
 		return err
 	}
 
+	addresses, err := c.db.AddressesById(p.Id)
+	if err != nil {
+		return err
+	}
+
+	user := UserProfileShort{
+		Id:         p.Id,
+		Name:       p.Name,
+		Username:   p.Username,
+		AvatarExt:  p.AvatarExt,
+		LastUpdate: p.LastUpdate,
+		Addresses:  make(map[types.Currency]string),
+	}
+
+	for _, v := range addresses {
+		user.Addresses[v.Network.Currency()] = v.Address
+	}
+
+	b, err := json.Marshal(&user)
+	if err != nil {
+		return err
+	}
+
+	w.Write(b)
+	return nil
+}
+func (c *Controller) myProfile(w http.ResponseWriter, r *http.Request) error {
 	id := middleware.AuthId(r)
+
 	profile, err := c.db.ProfileById(id)
-	if err != nil && err != pg.ErrNoRows {
-		return err
-	}
-
-	if c != nil && profile.Id != id {
-		return InvalidSignInErr
-	}
-
-	rq := ConfirmRegRq{}
-	err = json.Unmarshal(b, &rq)
 	if err != nil {
 		return err
 	}
 
-	strTimestamp := r.Header.Get(string(middleware.SignTimestamp))
-	timestamp, err := strconv.ParseInt(strTimestamp, 10, 64)
+	myProfile := &MyProfile{
+		Id:          profile.Id,
+		Name:        profile.Name,
+		Username:    profile.Username,
+		PhoneNumber: profile.PhoneNumber,
+		Email:       profile.Email,
+		IsMigratory: profile.IsMigratory,
+		AvatarExt:   profile.AvatarExt,
+		LastUpdate:  profile.LastUpdate,
+	}
+	rsByte, err := json.Marshal(myProfile)
 	if err != nil {
 		return err
 	}
 
-	rqTime := time.Unix(timestamp, 0)
-	if rqTime.After(time.Now().Add(controller.SignTimeout)) {
-		return controller.InvalidSignTimeErr
-	}
-
-	if len(rq.Addresses) < 2 ||
-		rq.Addresses[0].Network != types.Polkadot ||
-		rq.Addresses[1].Network != types.Kusama {
-		return controller.InvalidRqErr
-	}
-
-	msg := SignAddressMsg + r.Header.Get(string(middleware.AuthPubKey)) + strconv.FormatInt(rqTime.Unix(), 10)
-
-	for _, v := range rq.Addresses {
-		pubKey, err := utils.ParsePubKey(v.PubKey)
-		if err != nil {
-			return err
-		}
-
-		if v.Network.Address(pubKey[:]) != v.Address {
-			return controller.InvalidAddressErr
-		}
-		if err := utils.Verify(pubKey, msg, v.Sign); err != nil {
-			return err
-		}
-
-		addressExist, err := c.db.AddressIsExist(v.Address)
-		if err != nil {
-			return err
-		}
-
-		if addressExist {
-			return AddressExistErr
-		}
-	}
-
-	auth, err := c.db.AuthByPhoneNumber(rq.PhoneNumber)
+	_, err = w.Write(rsByte)
 	if err != nil {
-		return err
-	}
-
-	if auth.Attempts >= MaxWrongCodeSend {
-		return InvalidNumberOfAttempts
-	}
-
-	if auth.Code != strconv.Itoa(rq.Code) {
-		auth.Attempts++
-
-		if err := c.db.UpdateByPK(auth); err != nil {
-			return err
-		}
-
-		return InvalidCodeErr
-	}
-
-	var addresses []*db.Address
-	for _, v := range rq.Addresses {
-		addresses = append(addresses, &db.Address{
-			Id:      id,
-			Address: v.Address,
-			Network: v.Network,
-		})
-	}
-
-	if err := c.db.CreateProfile(r.Context(), &db.Profile{
-		Id:          id,
-		PhoneNumber: rq.PhoneNumber,
-	}, addresses); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *Controller) updateProfile(r *http.Request) error {
+func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
@@ -270,7 +250,9 @@ func (c *Controller) updateProfile(r *http.Request) error {
 		return err
 	}
 
-	if profile.Username != rq.Username {
+	now := time.Now()
+	sec := now.Unix()
+	if profile.Username != strings.ToLower(rq.Username) {
 		isExist, err := c.usernameIsExist(rq.Username)
 		if err != nil {
 			return err
@@ -281,13 +263,16 @@ func (c *Controller) updateProfile(r *http.Request) error {
 		}
 
 		profile.Username = rq.Username
+		profile.LastUpdate = sec
 	}
+
 	if profile.Name != rq.Name {
 		if !validators.IsValidName(rq.Name) {
 			return InvalidPropertyErr
 		}
 
 		profile.Name = rq.Name
+		profile.LastUpdate = sec
 	}
 
 	err = c.db.UpdateByPK(profile)
@@ -297,8 +282,196 @@ func (c *Controller) updateProfile(r *http.Request) error {
 
 	return nil
 }
-func (c *Controller) findUsername(r *http.Request) error {
-	exist, err := c.usernameIsExist(r.URL.Query()["number"][0])
+func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error {
+	base64File := r.FormValue("avatar")
+
+	decoded, err := base64.StdEncoding.DecodeString(base64File)
+	if err != nil {
+		return err
+	}
+
+	extension := r.FormValue("format")
+
+	if extension != "image/jpeg" && extension != "image/jpg" && extension != "image/png" {
+		return InvalidFileFormatErr
+	}
+
+	size := len(decoded)
+	if size > MaxAvatarSize {
+		return InvalidFileSizeErr
+	}
+
+	id := middleware.AuthId(r)
+	log.Printf("Id: %s \n", id)
+	log.Printf("File Size: %+v\n", size)
+	log.Printf("MIME Header: %+v\n", extension)
+
+	ex := strings.Split(extension, "/")
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileName := path + AvatarDir + "/" + id + "." + ex[1]
+	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+
+	err = file.Truncate(0)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(decoded)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	sec := now.Unix()
+
+	profile, err := c.db.ProfileById(id)
+	if err != nil {
+		return err
+	}
+
+	profile.AvatarExt = ex[1]
+	profile.LastUpdate = sec
+	err = c.db.UpdateByPK(profile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Controller) myContacts(w http.ResponseWriter, r *http.Request) error {
+	id := middleware.AuthId(r)
+
+	existContacts, err := c.db.AllContacts(id)
+	if err != nil {
+		return err
+	}
+
+	var contacts []string
+	for _, v := range existContacts {
+		contacts = append(contacts, v.PhoneNumber)
+	}
+	rsByte, err := json.Marshal(contacts)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) error {
+	id := middleware.AuthId(r)
+	p, err := c.db.ProfileById(id)
+	if err != nil {
+		return err
+	}
+
+	matchContacts, err := c.db.AllMatchContacts(p.Id, p.PhoneNumber)
+	if err != nil {
+		return err
+	}
+
+	var users []UserProfileShort
+	for _, v := range matchContacts {
+		addresses, err := c.db.AddressesById(v.Id)
+		if err != nil {
+			continue
+		}
+
+		user := UserProfileShort{
+			Id:         v.Id,
+			Name:       v.Name,
+			Username:   v.Username,
+			AvatarExt:  v.AvatarExt,
+			LastUpdate: v.LastUpdate,
+			Addresses:  make(map[types.Currency]string),
+		}
+
+		for _, v := range addresses {
+			user.Addresses[v.Network.Currency()] = v.Address
+		}
+
+		users = append(users, user)
+	}
+
+	rsByte, err := json.Marshal(&users)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func (c *Controller) uploadMyContact(w http.ResponseWriter, r *http.Request) error {
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+
+	id := middleware.AuthId(r)
+
+	var contacts []string
+	err = json.Unmarshal(b, &contacts)
+	if err != nil {
+		return err
+	}
+
+	for len(contacts) > MaxContacts {
+		contacts = contacts[0:MaxContacts]
+	}
+
+	existContacts, err := c.db.AllContacts(id)
+	if err != nil && err != db.ErrNoRows {
+		return err
+	}
+
+	existContactsMap := make(map[string]bool)
+	for _, v := range existContacts {
+		existContactsMap[v.PhoneNumber] = true
+	}
+
+	var myContacts []db.Contact
+	for _, v := range contacts {
+		if !utils.ValidatePhoneNumber(v) {
+			continue
+		}
+		if _, ok := existContactsMap[v]; ok {
+			continue
+		}
+
+		myContacts = append(myContacts, db.Contact{
+			Id:          id,
+			PhoneNumber: v,
+		})
+	}
+
+	if len(myContacts) > 0 {
+		err = c.db.Insert(&myContacts)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) findUsername(w http.ResponseWriter, r *http.Request) error {
+	exist, err := c.usernameIsExist(strings.ToLower(r.URL.Query()["username"][0]))
 	if err != nil {
 		return err
 	}

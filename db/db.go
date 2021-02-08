@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fractapp-server/types"
 
 	"github.com/go-pg/pg/v10"
 )
@@ -13,11 +14,24 @@ var (
 type DB interface {
 	SubscribersCountByToken(token string) (int, error)
 	SubscriberByAddress(address string) (*Subscriber, error)
-	AuthByPhoneNumber(phoneNumber string) (*Auth, error)
+	AuthByValue(value string, codeType types.CodeType, checkType types.CheckType) (*Auth, error)
+	AddressesById(id string) ([]Address, error)
 	ProfileById(id string) (*Profile, error)
+	ProfileByAddress(address string) (*Profile, error)
+	ProfileByUsername(username string) (*Profile, error)
 	AddressIsExist(address string) (bool, error)
 	UsernameIsExist(username string) (bool, error)
+	SearchUsersByUsername(value string, limit int) ([]Profile, error)
+	SearchUsersByEmail(value string) (*Profile, error)
+	ProfileByPhoneNumber(contactPhoneNumber string, myPhoneNumber string) (*Profile, error)
 	CreateProfile(ctx context.Context, profile *Profile, addresses []*Address) error
+	IdByToken(token string) (string, error)
+	TokenById(id string) (string, error)
+	AllContacts(id string) ([]Contact, error)
+	AllMatchContacts(id string, phoneNumber string) ([]Profile, error)
+
+	SubscribersByRange(from int, limit int) ([]Subscriber, error)
+	SubscribersCount() (int, error)
 
 	Insert(value interface{}) error
 	UpdateByPK(value interface{}) error

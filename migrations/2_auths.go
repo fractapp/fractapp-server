@@ -12,8 +12,8 @@ func init() {
 
 		_, err := db.Exec(`create table auths
 (
-    "phone_number"    varchar(15) not null
-        constraint phone_number_pk
+    "value"    varchar(256) not null
+        constraint value_pk
             primary key,
     "code"      varchar(6) not null,
  	"attempts"   integer,

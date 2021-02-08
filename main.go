@@ -8,21 +8,26 @@ import (
 	"fmt"
 	"fractapp-server/config"
 	"fractapp-server/controller"
+	"fractapp-server/controller/auth"
 	internalMiddleware "fractapp-server/controller/middleware"
 	"fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
+	"fractapp-server/email"
 	"fractapp-server/notificator"
 	"fractapp-server/scanner"
 	"fractapp-server/types"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/jwtauth"
 	"github.com/go-pg/pg/v10"
 )
 
@@ -67,6 +72,14 @@ func start(ctx context.Context) error {
 		return err
 	}
 
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path + profile.AvatarDir); os.IsNotExist(err) {
+		os.Mkdir(path+profile.AvatarDir, os.ModePerm)
+	}
+
 	// create http server
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -78,35 +91,93 @@ func start(ctx context.Context) error {
 
 	pgDb := (*db.PgDB)(database)
 
+	emailClient, err := email.New(config.Host, config.From.Address, config.From.Name, config.Password)
+	if err != nil {
+		return err
+	}
+
+	tokenAuth := jwtauth.New("HS256", []byte(config.Secret), nil)
 	nController := notification.NewController(pgDb)
-	pController := profile.NewController(
+	pController := profile.NewController(pgDb)
+	authController := auth.NewController(
 		pgDb,
 		config.SMSService.FromNumber,
 		config.SMSService.AccountSid,
 		config.SMSService.AuthToken,
+		emailClient,
+		tokenAuth,
 	)
 
-	r.Route(nController.MainRoute(), func(r chi.Router) {
-		r.Post(notification.SubscribeRoute, controller.Route(nController, notification.SubscribeRoute))
+	authMiddleware := internalMiddleware.New(pgDb)
+
+	r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
+	r.Group(func(r chi.Router) {
+		r.Use(authMiddleware.PubKeyAuth)
+		r.Route(authController.MainRoute(), func(r chi.Router) {
+			r.Post(auth.SignInRoute, controller.Route(authController, auth.SignInRoute))
+		})
 	})
 
-	r.With(internalMiddleware.PubKeyAuth).Route(pController.MainRoute(), func(r chi.Router) {
-		r.Post(profile.AuthRoute, controller.Route(pController, profile.AuthRoute))
-		r.Post(profile.ConfirmAuthRoute, controller.Route(pController, profile.ConfirmAuthRoute))
-		r.Post(profile.UpdateProfileRoute, controller.Route(pController, profile.UpdateProfileRoute))
-		r.Get(profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
+	fs := http.FileServer("." + http.Dir(profile.AvatarDir))
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := os.Stat(path + profile.AvatarDir + "/" + r.RequestURI); os.IsNotExist(err) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		} else {
+			fs.ServeHTTP(w, r)
+		}
 	})
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	})
+	r.Group(func(r chi.Router) {
+		r.Use(jwtauth.Verifier(tokenAuth))
+		r.Use(authMiddleware.JWTAuth)
+
+		r.Route(pController.MainRoute(), func(r chi.Router) {
+			r.Get(profile.MyProfileRoute, controller.Route(pController, profile.MyProfileRoute))
+			r.Get(profile.MyContactsRoute, controller.Route(pController, profile.MyContactsRoute))
+			r.Get(profile.MyMatchContactsRoute, controller.Route(pController, profile.MyMatchContactsRoute))
+
+			r.Post(profile.UpdateProfileRoute, controller.Route(pController, profile.UpdateProfileRoute))
+			r.Post(profile.UploadAvatarRoute, controller.Route(pController, profile.UploadAvatarRoute))
+			r.Post(profile.UploadContactsRoute, controller.Route(pController, profile.UploadContactsRoute))
+
+		})
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
+		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
+		r.Get(pController.MainRoute()+profile.ProfileInfoRoute, controller.Route(pController, profile.ProfileInfoRoute))
+
+		r.Route(nController.MainRoute(), func(r chi.Router) {
+			r.Post(notification.SubscribeRoute, controller.Route(nController, notification.SubscribeRoute))
+		})
+	})
+
+	url, err := url.Parse(host)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
-		Addr:    host,
+		Addr:    url.Host,
 		Handler: r,
 	}
 
 	// start http server
 	go func() {
-		err = srv.ListenAndServe()
-		if err != nil {
-			log.Fatal(err)
+		if strings.HasPrefix(host, "https") {
+			err = srv.ListenAndServeTLS("./cert.pem", "./key.pem")
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			err = srv.ListenAndServe()
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}()
 
@@ -118,7 +189,7 @@ func start(ctx context.Context) error {
 	}
 	for k, url := range config.SubstrateUrls {
 		network := types.ParseNetwork(k)
-		es := scanner.NewEventScanner(url, database, network.String(), network, n)
+		es := scanner.NewEventScanner(url, pgDb, network.String(), network, n)
 		go func() {
 			err = es.Start()
 			if err != nil {

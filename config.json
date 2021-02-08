@@ -17,6 +17,15 @@
     "User": "",
     "Password": "",
     "Database": ""
+  },
+  "Secret": "",
+  "SMTP": {
+    "Host": "",
+    "Password": "",
+    "From": {
+      "Name": "",
+      "Address": ""
+    }
   }
 }
 

@@ -3,20 +3,22 @@ package db
 import "fractapp-server/types"
 
 type Auth struct {
-	PhoneNumber string `pg:"phone_number,pk"`
-	Code        string
-	Attempts    int32
-	Count       int32 `pg:",use_zero"`
-	Timestamp   int64
-	Type        types.CodeType
-	CheckType   types.CheckType
+	Value     string          `pg:"value,pk"`
+	Code      string          `pg:",use_zero"`
+	Attempts  int32           `pg:",use_zero"`
+	Count     int32           `pg:",use_zero"`
+	Timestamp int64           `pg:",use_zero"`
+	Type      types.CodeType  `pg:",use_zero"`
+	CheckType types.CheckType `pg:",use_zero"`
 }
 
-func (db *PgDB) AuthByPhoneNumber(phoneNumber string) (*Auth, error) {
+func (db *PgDB) AuthByValue(value string, codeType types.CodeType, checkType types.CheckType) (*Auth, error) {
 	auth := &Auth{}
-	err := db.Model(auth).Where("phone_number = ?", phoneNumber).Select()
+	err := db.Model(auth).Where("value = ?", value).
+		Where("type = ?", codeType).
+		Where("check_type = ?", checkType).Select()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return auth, nil

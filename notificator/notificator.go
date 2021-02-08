@@ -62,9 +62,9 @@ func (n *FirebaseNotificator) Notify(msg string, token string) error {
 func (n *FirebaseNotificator) Msg(member string, txType TxType, amount float64, currency types.Currency) string {
 	switch txType {
 	case Sent:
-		return fmt.Sprintf("Transfer to %s in the amount of %.2f %s", member, amount, currency.String())
+		return fmt.Sprintf("You sent %.3f %s to %s", amount, currency.String(), member)
 	case Received:
-		return fmt.Sprintf("Transfer from %s in the amount of %.2f %s", member, amount, currency.String())
+		return fmt.Sprintf("You received %.3f %s from %s", amount, currency.String(), member)
 	}
 
 	return ""

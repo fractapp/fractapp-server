@@ -7,7 +7,7 @@ import (
 
 type Controller interface {
 	MainRoute() string
-	Handler(route string) (func(r *http.Request) error, error)
+	Handler(route string) (func(w http.ResponseWriter, r *http.Request) error, error)
 	ReturnErr(err error, w http.ResponseWriter)
 }
 
@@ -19,7 +19,7 @@ func Route(c Controller, route string) func(w http.ResponseWriter, r *http.Reque
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := h(r); err != nil {
+		if err := h(w, r); err != nil {
 			log.Printf("Http error: %s \n", err.Error())
 
 			c.ReturnErr(err, w)

@@ -1,2 +1,5 @@
 config.*.json
 .idea
+.avatars
+cert.pem
+key.pem

@@ -1,43 +1,39 @@
 package validators
 
 import (
-	"strings"
+	"regexp"
 )
 
 const (
 	MaxUsernameLength = 30
-	MaxNameLength     = 40
+	MinUsernameLength = 4
+	MaxNameLength     = 32
+	MinNameLength     = 4
 
-	//TODO take more symbols
-	InvalidSym = "@?.,&^%$#@!^&*()-+=:''`?.,"
+	patternForUsername = "^[0-9a-z]*$"
+	patternForName     = "^[0-9a-zA-z ]*$"
 )
 
-//TODO transfer to any pkg
 func IsValidUsername(username string) bool {
-	if len(username) > MaxUsernameLength {
+	if len(username) > MaxUsernameLength || len(username) < MinUsernameLength {
 		return false
 	}
 
-	count := strings.Count(" ", username)
-	//TODO test
-	for _, v := range InvalidSym {
-		count += strings.Count(string(v), username)
+	if v, _ := regexp.MatchString(patternForUsername, username); !v {
+		return false
 	}
 
-	return count == 0
+	return true
 }
 
-//TODO  transfer to any pkg
 func IsValidName(name string) bool {
-	if len(name) > MaxNameLength {
+	if len(name) > MaxNameLength || len(name) < MinNameLength {
 		return false
 	}
 
-	var count int
-	//TODO test
-	for _, v := range InvalidSym {
-		count += strings.Count(string(v), name)
+	if v, _ := regexp.MatchString(patternForUsername, patternForName); !v {
+		return false
 	}
 
-	return count == 0
+	return true
 }

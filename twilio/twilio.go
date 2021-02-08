@@ -29,6 +29,10 @@ func NewApi(fromNumber string, accountSid string, authToken string) *Api {
 	}
 }
 
+func (api *Api) FormatNumber(phoneNumber string) string {
+	return "+" + strings.ReplaceAll(phoneNumber, " ", "")
+}
+
 func (api *Api) SendSMS(phoneNumber string, msg string, code string) error {
 	urlStr := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", api.accountSid)
 

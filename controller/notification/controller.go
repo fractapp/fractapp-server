@@ -36,7 +36,7 @@ func NewController(db db.DB) *Controller {
 func (c *Controller) MainRoute() string {
 	return "/notification"
 }
-func (c *Controller) Handler(route string) (func(r *http.Request) error, error) {
+func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.Request) error, error) {
 	switch route {
 	case SubscribeRoute:
 		return c.subscribe, nil
@@ -45,10 +45,14 @@ func (c *Controller) Handler(route string) (func(r *http.Request) error, error) 
 	return nil, controller.InvalidRouteErr
 }
 func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
-	http.Error(w, err.Error(), http.StatusBadRequest)
+	if err == MaxAddressCountByTokenErr {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	} else {
+		http.Error(w, "", http.StatusBadRequest)
+	}
 }
 
-func (c *Controller) subscribe(r *http.Request) error {
+func (c *Controller) subscribe(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err

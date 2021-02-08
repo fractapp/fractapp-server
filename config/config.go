@@ -10,7 +10,20 @@ type Config struct {
 	SMSService    SMSService
 	Firebase      Firebase
 	DB            DB
+	Secret        string
+	SMTP          `json:"SMTP"`
 }
+
+type SMTP struct {
+	Host     string
+	From     FromEmail
+	Password string
+}
+type FromEmail struct {
+	Name    string
+	Address string
+}
+
 type SMSService struct {
 	FromNumber string
 	AccountSid string
