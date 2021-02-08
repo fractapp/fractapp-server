@@ -4,6 +4,7 @@ import "fractapp-server/types"
 
 type Auth struct {
 	Value     string          `pg:"value,pk"`
+	IsValid   bool            `pg:"is_valid,use_zero"`
 	Code      string          `pg:",use_zero"`
 	Attempts  int32           `pg:",use_zero"`
 	Count     int32           `pg:",use_zero"`

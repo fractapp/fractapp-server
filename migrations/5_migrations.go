@@ -15,6 +15,7 @@ func init() {
 	"number" bigserial
 		constraint account_migrations_pk
 	primary key,
+	"is_valid" boolean,
 	"id_from" varchar(64) not null
 		constraint account_migrations_profiles_id_fk_from
 	references profiles,

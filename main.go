@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/cors"
+
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/jwtauth"
@@ -109,6 +111,15 @@ func start(ctx context.Context) error {
 	)
 
 	authMiddleware := internalMiddleware.New(pgDb)
+
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{config.Origin},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Sign-Timestamp", "Sign", "Auth-Key", "Authorization"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}))
 
 	r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 	r.Group(func(r chi.Router) {

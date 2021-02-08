@@ -26,14 +26,13 @@ import (
 const (
 	SignAddressMsg   = "It is my auth key for fractapp:"
 	SMSMsg           = "Your code for Fractapp: %s"
-	SMSTimeout       = 1 //TODO 1 * time.Minute
-	ResetCountSMS    = 1 //TODO 1 * time.Hour
+	SMSTimeout       = 3 * time.Minute
+	ResetCountSMS    = 1 * time.Hour
 	MaxSMSCount      = 5
-	MaxWrongCodeSend = 300 // 3
+	MaxWrongCodeSend = 3
 
-	SendCodeRoute   = "/sendCode"
-	SignInRoute     = "/signIn"
-	TokenValidRoute = "/tokenValid"
+	SendCodeRoute = "/sendCode"
+	SignInRoute   = "/signIn"
 )
 
 var (
@@ -87,6 +86,8 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 		http.Error(w, err.Error(), http.StatusAccepted)
 	case InvalidNumberOfAttempts:
 		http.Error(w, err.Error(), http.StatusTooManyRequests)
+	case AddressExistErr:
+		fallthrough
 	case AccountExistErr:
 		http.Error(w, err.Error(), http.StatusForbidden)
 	default:
@@ -134,10 +135,11 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 
 	now := time.Now()
 
-	if err == pg.ErrNoRows {
+	if err == pg.ErrNoRows || auth == nil {
 		auth = &db.Auth{
-			Value: rq.Value,
-			Type:  rq.Type,
+			Value:   rq.Value,
+			Type:    rq.Type,
+			IsValid: true,
 		}
 	} else {
 		if now.Before(time.Unix(auth.Timestamp, 0).Add(SMSTimeout)) {
@@ -147,6 +149,7 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 			return InvalidSendSMSTimeoutErr
 		}
 	}
+
 	if now.After(time.Unix(auth.Timestamp, 0).Add(ResetCountSMS)) {
 		auth.Count = 0
 	}
@@ -156,6 +159,7 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	auth.Timestamp = now.Unix()
 	auth.Count++
 	auth.Attempts = 0
+	auth.IsValid = true
 
 	if err == pg.ErrNoRows {
 		err = c.db.Insert(auth)
@@ -274,7 +278,6 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 				return AccountExistErr
 			}
 		}
-
 	}
 
 	if profile == nil {
@@ -361,6 +364,9 @@ func (c *Controller) confirm(value string, codeType types.CodeType, checkType ty
 
 		return InvalidCodeErr
 	}
+	auth.IsValid = false
+
+	c.db.UpdateByPK(auth)
 
 	return nil
 }
