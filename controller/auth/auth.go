@@ -33,6 +33,7 @@ const (
 
 	SendCodeRoute = "/sendCode"
 	SignInRoute   = "/signIn"
+	PingRoute     = "/ping"
 )
 
 var (
@@ -70,6 +71,8 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.sendCode, nil
 	case SignInRoute:
 		return c.signIn, nil
+	case PingRoute:
+		return c.ping, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -93,6 +96,11 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	default:
 		http.Error(w, "", http.StatusBadRequest)
 	}
+}
+
+func (c *Controller) ping(w http.ResponseWriter, r *http.Request) error {
+	w.Write([]byte("Pong"))
+	return nil
 }
 
 func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {

@@ -15,6 +15,8 @@ func init() {
     "value"    varchar(256) not null
         constraint value_pk
             primary key,
+
+	"is_valid" boolean,
     "code"      varchar(6) not null,
  	"attempts"   integer,
     "count"   integer,

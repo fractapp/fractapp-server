@@ -19,10 +19,8 @@ import (
 	"fractapp-server/types"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	"github.com/go-chi/cors"
@@ -159,6 +157,7 @@ func start(ctx context.Context) error {
 
 	r.Group(func(r chi.Router) {
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
+		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
 		r.Get(pController.MainRoute()+profile.ProfileInfoRoute, controller.Route(pController, profile.ProfileInfoRoute))
 
@@ -167,28 +166,16 @@ func start(ctx context.Context) error {
 		})
 	})
 
-	url, err := url.Parse(host)
-	if err != nil {
-		return err
-	}
-
 	srv := &http.Server{
-		Addr:    url.Host,
+		Addr:    host,
 		Handler: r,
 	}
 
 	// start http server
 	go func() {
-		if strings.HasPrefix(host, "https") {
-			err = srv.ListenAndServeTLS("./cert.pem", "./key.pem")
-			if err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			err = srv.ListenAndServe()
-			if err != nil {
-				log.Fatal(err)
-			}
+		err = srv.ListenAndServe()
+		if err != nil {
+			log.Fatal(err)
 		}
 	}()
 

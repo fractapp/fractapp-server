@@ -8,8 +8,8 @@ import (
 
 	dbType "fractapp-server/types"
 
-	gsrpc "github.com/centrifuge/go-substrate-rpc-client"
-	"github.com/centrifuge/go-substrate-rpc-client/types"
+	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v2"
+	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
 )
 
 const addressesLimit = 100000
