@@ -23,8 +23,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/go-chi/cors"
-
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/jwtauth"
@@ -110,15 +108,6 @@ func start(ctx context.Context) error {
 
 	authMiddleware := internalMiddleware.New(pgDb)
 
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{config.Origin},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Sign-Timestamp", "Sign", "Auth-Key", "Authorization"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
-	}))
-
 	r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware.PubKeyAuth)
@@ -159,7 +148,7 @@ func start(ctx context.Context) error {
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
-		r.Get(pController.MainRoute()+profile.ProfileInfoRoute, controller.Route(pController, profile.ProfileInfoRoute))
+		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))
 
 		r.Route(nController.MainRoute(), func(r chi.Router) {
 			r.Post(notification.SubscribeRoute, controller.Route(nController, notification.SubscribeRoute))

@@ -6,7 +6,6 @@ import (
 )
 
 type Config struct {
-	Origin        string
 	SubstrateUrls map[string]string
 	SMSService    SMSService
 	Firebase      Firebase

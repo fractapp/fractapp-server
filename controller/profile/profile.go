@@ -27,7 +27,7 @@ const (
 	MyContactsRoute      = "/contacts"
 	UploadContactsRoute  = "/uploadContacts"
 	MyMatchContactsRoute = "/matchContacts"
-	ProfileInfoRoute     = "/info"
+	InfoRoute            = "/info"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -76,7 +76,7 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.myMatchContacts, nil
 	case UploadContactsRoute:
 		return c.uploadMyContact, nil
-	case ProfileInfoRoute:
+	case InfoRoute:
 		return c.profile, nil
 	}
 

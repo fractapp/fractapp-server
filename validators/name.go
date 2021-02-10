@@ -31,7 +31,7 @@ func IsValidName(name string) bool {
 		return false
 	}
 
-	if v, _ := regexp.MatchString(patternForUsername, patternForName); !v {
+	if v, _ := regexp.MatchString(patternForName, name); !v {
 		return false
 	}
 
