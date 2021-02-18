@@ -3,17 +3,14 @@ package auth
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/controller/middleware"
 	"fractapp-server/db"
-	"fractapp-server/email"
-	"fractapp-server/twilio"
+	"fractapp-server/notification"
 	"fractapp-server/types"
 	"fractapp-server/utils"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,40 +21,43 @@ import (
 )
 
 const (
-	SignAddressMsg   = "It is my auth key for fractapp:"
-	SMSMsg           = "Your code for Fractapp: %s"
-	SMSTimeout       = 3 * time.Minute
-	ResetCountSMS    = 1 * time.Hour
-	MaxSMSCount      = 5
-	MaxWrongCodeSend = 3
+	SignAddressMsg       = "It is my auth key for fractapp:"
+	CodeSendTimeout      = 3 * time.Minute
+	CodeTimeout          = 10 * time.Minute
+	ResetTimeout         = 1 * time.Hour
+	MaxSendCount         = 5
+	MaxWrongCodeAttempts = 3
 
 	SendCodeRoute = "/sendCode"
 	SignInRoute   = "/signIn"
 )
 
 var (
-	InvalidSendSMSTimeoutErr = errors.New("expect timeout for new SMS sending")
+	InvalidSendTimeoutErr = errors.New("expect timeout for new code sending")
 
-	AddressExistErr         = errors.New("address exist")
-	AccountExistErr         = errors.New("account exist")
-	InvalidCodeErr          = errors.New("invalid confirm code")
-	InvalidNumberOfAttempts = errors.New("invalid number of attempts")
+	AddressExistErr            = errors.New("address exist")
+	AccountExistErr            = errors.New("account exist")
+	InvalidCodeErr             = errors.New("invalid confirm code")
+	InvalidNumberOfAttemptsErr = errors.New("invalid number of attempts")
+	CodeUsedErr                = errors.New("code used")
+	CodeExpiredErr             = errors.New("code expired")
 )
 
 type Controller struct {
 	db          db.DB
-	twilio      *twilio.Api
-	emailClient *email.Client
+	notificator map[notification.NotificatorType]notification.Notificator
 	jwtauth     *jwtauth.JWTAuth
 }
 
-func NewController(db db.DB, fromNumber string, accountSid string, authToken string,
-	emailClient *email.Client, jwtauth *jwtauth.JWTAuth) *Controller {
+func NewController(db db.DB, sms notification.Notificator,
+	email notification.Notificator, jwtauth *jwtauth.JWTAuth) *Controller {
 	return &Controller{
-		db:          db,
-		twilio:      twilio.NewApi(fromNumber, accountSid, authToken),
-		emailClient: emailClient,
-		jwtauth:     jwtauth,
+		db: db,
+		notificator: map[notification.NotificatorType]notification.Notificator{
+			notification.Email: email,
+			notification.SMS:   sms,
+		},
+		jwtauth: jwtauth,
 	}
 }
 
@@ -76,15 +76,19 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 }
 func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	switch err {
-	case email.InvalidEmailErr:
+	case notification.InvalidEmailErr:
 		fallthrough
 	case InvalidCodeErr:
 		fallthrough
-	case twilio.InvalidPhoneNumberErr:
+	case notification.InvalidPhoneNumberErr:
 		http.Error(w, err.Error(), http.StatusNotFound)
-	case InvalidSendSMSTimeoutErr:
+	case InvalidSendTimeoutErr:
 		http.Error(w, err.Error(), http.StatusAccepted)
-	case InvalidNumberOfAttempts:
+	case CodeExpiredErr:
+		fallthrough
+	case CodeUsedErr:
+		fallthrough
+	case InvalidNumberOfAttemptsErr:
 		http.Error(w, err.Error(), http.StatusTooManyRequests)
 	case AddressExistErr:
 		fallthrough
@@ -108,24 +112,10 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	log.Printf("Type: %d Value: %s\n", rq.Type, rq.Value)
-	switch rq.Type {
-	case types.PhoneNumberCode:
-		rq.Value = c.twilio.FormatNumber(rq.Value)
-		if err := c.twilio.ValidatePhoneNumber(rq.Value); err != nil {
-			return err
-		}
-	case types.EmailCode:
-		rq.Value = c.emailClient.FormatEmail(rq.Value)
-		if err := c.emailClient.ValidateEmail(rq.Value); err != nil {
-			return err
-		}
-	}
 
-	generator := rand.New(rand.NewSource(time.Now().UnixNano()))
-	codeInt := generator.Intn(999999)
-	code := fmt.Sprintf("%d", codeInt)
-	if len(code) < 6 {
-		code = fmt.Sprintf("%06s", code)
+	rq.Value = c.notificator[rq.Type].Format(rq.Value)
+	if err := c.notificator[rq.Type].Validate(rq.Value); err != nil {
+		return err
 	}
 
 	auth, err := c.db.AuthByValue(rq.Value, rq.Type, rq.CheckType)
@@ -142,17 +132,18 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 			IsValid: true,
 		}
 	} else {
-		if now.Before(time.Unix(auth.Timestamp, 0).Add(SMSTimeout)) {
-			return InvalidSendSMSTimeoutErr
-		}
-		if now.Before(time.Unix(auth.Timestamp, 0).Add(ResetCountSMS)) && auth.Count >= MaxSMSCount {
-			return InvalidSendSMSTimeoutErr
+		if now.Before(time.Unix(auth.Timestamp, 0).Add(CodeSendTimeout)) ||
+			(auth.Count >= MaxSendCount && now.Before(time.Unix(auth.Timestamp, 0).Add(ResetTimeout))) {
+
+			return InvalidSendTimeoutErr
 		}
 	}
 
-	if now.After(time.Unix(auth.Timestamp, 0).Add(ResetCountSMS)) {
+	if now.After(time.Unix(auth.Timestamp, 0).Add(ResetTimeout)) {
 		auth.Count = 0
 	}
+
+	code := generateCode()
 
 	auth.CheckType = rq.CheckType
 	auth.Code = code
@@ -166,19 +157,13 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	} else {
 		err = c.db.UpdateByPK(auth)
 	}
+
 	if err != nil {
 		return err
 	}
 
-	switch rq.Type {
-	case types.PhoneNumberCode:
-		if err := c.twilio.SendSMS(rq.Value, SMSMsg, code); err != nil {
-			return err
-		}
-	case types.EmailCode:
-		if err := c.emailClient.SendCode(rq.Value, code); err != nil {
-			return err
-		}
+	if err := c.notificator[rq.Type].SendCode(rq.Value, code); err != nil {
+		return err
 	}
 
 	return nil
@@ -189,21 +174,16 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	rq := ConfirmRegRq{}
-	err = json.Unmarshal(b, &rq)
+	rq := &ConfirmRegRq{}
+	err = json.Unmarshal(b, rq)
 	if err != nil {
 		return err
 	}
 
-	switch rq.Type {
-	case types.PhoneNumberCode:
-		rq.Value = c.twilio.FormatNumber(rq.Value)
-	case types.EmailCode:
-		rq.Value = c.emailClient.FormatEmail(rq.Value)
-	}
+	rq.Value = c.notificator[rq.Type].Format(rq.Value)
 
 	//check confirm code
-	if err := c.confirm(rq.Value, rq.Type, types.Auth, rq.Code); err != nil {
+	if err := c.confirm(rq.Value, rq.Type, notification.Auth, rq.Code); err != nil {
 		return err
 	}
 
@@ -225,62 +205,29 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	rqTime := time.Unix(timestamp, 0)
-	if rqTime.After(time.Now().Add(controller.SignTimeout)) {
+	now := time.Now()
+	if now.After(rqTime.Add(controller.SignTimeout)) || now.After(rqTime.Add(1*time.Minute)) {
 		return controller.InvalidSignTimeErr
 	}
 
-	if len(rq.Addresses) != 2 {
-		return controller.InvalidRqErr
-	}
-	if _, ok := rq.Addresses[types.Polkadot]; !ok {
-		return controller.InvalidRqErr
-	}
-	if _, ok := rq.Addresses[types.Kusama]; !ok {
-		return controller.InvalidRqErr
-	}
-
-	msg := SignAddressMsg + r.Header.Get(string(middleware.AuthPubKey)) + strconv.FormatInt(rqTime.Unix(), 10)
-	for network, v := range rq.Addresses {
-		pubKey, err := utils.ParsePubKey(v.PubKey)
-		if err != nil {
-			return err
-		}
-
-		if network.Address(pubKey[:]) != v.Address {
-			return controller.InvalidAddressErr
-		}
-		if err := utils.Verify(pubKey, msg, v.Sign); err != nil {
-			return err
-		}
-
-		if profile != nil {
-			continue
-		}
-
-		addressExist, err := c.db.AddressIsExist(v.Address)
-		if err != nil {
-			return err
-		}
-
-		if addressExist {
-			return AddressExistErr
-		}
+	err = c.checkAddresses(rq, r.Header.Get(string(middleware.AuthPubKey)), rqTime, profile)
+	if err != nil {
+		return err
 	}
 
 	// if user was registered that check addresses
 	if profile != nil {
-		addresses, err := c.db.AddressesById(id)
+		switch rq.Type {
+		case notification.Email:
+			profile.Email = rq.Value
+		case notification.SMS:
+			profile.PhoneNumber = rq.Value
+		}
+		err = c.db.UpdateByPK(profile)
 		if err != nil {
 			return err
 		}
-		for _, v := range addresses {
-			if rq.Addresses[v.Network].Address != v.Address {
-				return AccountExistErr
-			}
-		}
-	}
-
-	if profile == nil {
+	} else {
 		var addresses []*db.Address
 		for network, v := range rq.Addresses {
 			addresses = append(addresses, &db.Address{
@@ -296,28 +243,18 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		switch rq.Type {
-		case types.EmailCode:
+		case notification.Email:
 			profile.Email = rq.Value
-		case types.PhoneNumberCode:
+		case notification.SMS:
 			profile.PhoneNumber = rq.Value
 		}
 
 		if err := c.db.CreateProfile(r.Context(), profile, addresses); err != nil {
 			return err
 		}
-	} else {
-		switch rq.Type {
-		case types.EmailCode:
-			profile.Email = rq.Value
-		case types.PhoneNumberCode:
-			profile.PhoneNumber = rq.Value
-		}
-		err = c.db.UpdateByPK(profile)
-		if err != nil {
-			return err
-		}
 	}
-	_, tokenString, err := c.jwtauth.Encode(map[string]interface{}{"id": id})
+
+	_, tokenString, err := c.jwtauth.Encode(map[string]interface{}{"id": id, "timestamp": now.Unix()})
 	if err != nil {
 		return err
 	}
@@ -345,14 +282,22 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 
 	return nil
 }
-func (c *Controller) confirm(value string, codeType types.CodeType, checkType types.CheckType, code string) error {
+func (c *Controller) confirm(value string, codeType notification.NotificatorType, checkType notification.CheckType, code string) error {
 	auth, err := c.db.AuthByValue(value, codeType, checkType)
 	if err != nil {
 		return err
 	}
 
-	if auth.Attempts >= MaxWrongCodeSend {
-		return InvalidNumberOfAttempts
+	if auth.Attempts >= MaxWrongCodeAttempts {
+		return InvalidNumberOfAttemptsErr
+	}
+
+	if !auth.IsValid {
+		return CodeUsedErr
+	}
+
+	if time.Unix(auth.Timestamp, 0).Add(CodeTimeout).Before(time.Now()) {
+		return CodeExpiredErr
 	}
 
 	if auth.Code != code {
@@ -368,5 +313,57 @@ func (c *Controller) confirm(value string, codeType types.CodeType, checkType ty
 
 	c.db.UpdateByPK(auth)
 
+	return nil
+}
+func (c *Controller) checkAddresses(rq *ConfirmRegRq, authPubKey string, rqTime time.Time, profile *db.Profile) error {
+	if len(rq.Addresses) != 2 {
+		return controller.InvalidRqErr
+	}
+	if _, ok := rq.Addresses[types.Polkadot]; !ok {
+		return controller.InvalidRqErr
+	}
+	if _, ok := rq.Addresses[types.Kusama]; !ok {
+		return controller.InvalidRqErr
+	}
+
+	msg := SignAddressMsg + authPubKey + strconv.FormatInt(rqTime.Unix(), 10)
+	for network, v := range rq.Addresses {
+		pubKey, err := utils.ParsePubKey(v.PubKey)
+		if err != nil {
+			return err
+		}
+
+		if network.Address(pubKey[:]) != v.Address {
+			return controller.InvalidAddressErr
+		}
+		if err := utils.Verify(pubKey, msg, v.Sign); err != nil {
+			return err
+		}
+
+		if profile != nil {
+			continue
+		}
+
+		addressExist, err := c.db.AddressIsExist(v.Address)
+		if err != nil {
+			return err
+		}
+
+		if addressExist {
+			return AddressExistErr
+		}
+	}
+
+	if profile != nil {
+		addresses, err := c.db.AddressesById(profile.Id)
+		if err != nil {
+			return err
+		}
+		for _, v := range addresses {
+			if rq.Addresses[v.Network].Address != v.Address {
+				return AccountExistErr
+			}
+		}
+	}
 	return nil
 }

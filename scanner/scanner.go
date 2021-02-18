@@ -2,7 +2,7 @@ package scanner
 
 import (
 	"fractapp-server/db"
-	"fractapp-server/notificator"
+	"fractapp-server/firebase"
 	"log"
 	"math/big"
 
@@ -19,10 +19,10 @@ type EventScanner struct {
 	db          db.DB
 	prefix      string
 	network     dbType.Network
-	notificator notificator.Notificator
+	notificator firebase.TxNotificator
 }
 
-func NewEventScanner(host string, db db.DB, prefix string, network dbType.Network, notificator notificator.Notificator) *EventScanner {
+func NewEventScanner(host string, db db.DB, prefix string, network dbType.Network, notificator firebase.TxNotificator) *EventScanner {
 	return &EventScanner{
 		host:        host,
 		db:          db,
@@ -163,7 +163,7 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 						name = p.Name
 					}
 
-					msg := s.notificator.Msg(name, notificator.Sent, currency.ConvertFromPlanck(amount), currency)
+					msg := s.notificator.Msg(name, firebase.Sent, currency.ConvertFromPlanck(amount), currency)
 					err = s.notificator.Notify(msg, sub.Token)
 
 					log.Printf("%s: Notify Type: Sent; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",
@@ -190,7 +190,7 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 						name = p.Name
 					}
 
-					msg := s.notificator.Msg(name, notificator.Received, currency.ConvertFromPlanck(amount), currency)
+					msg := s.notificator.Msg(name, firebase.Received, currency.ConvertFromPlanck(amount), currency)
 					err = s.notificator.Notify(msg, sub.Token)
 
 					log.Printf("%s: Notify Type: Received; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",

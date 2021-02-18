@@ -10,11 +10,11 @@ import (
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
 	internalMiddleware "fractapp-server/controller/middleware"
-	"fractapp-server/controller/notification"
+	notificationController "fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
-	"fractapp-server/email"
-	"fractapp-server/notificator"
+	"fractapp-server/firebase"
+	"fractapp-server/notification"
 	"fractapp-server/scanner"
 	"fractapp-server/types"
 	"log"
@@ -89,19 +89,20 @@ func start(ctx context.Context) error {
 
 	pgDb := (*db.PgDB)(database)
 
-	emailClient, err := email.New(config.Host, config.From.Address, config.From.Name, config.Password)
+	emailClient, err := notification.NewSMTPNotificator(config.Host, config.From.Address, config.From.Name, config.Password)
 	if err != nil {
 		return err
 	}
 
 	tokenAuth := jwtauth.New("HS256", []byte(config.Secret), nil)
-	nController := notification.NewController(pgDb)
+	twilioApi := notification.NewTwilioNotificator(config.SMSService.FromNumber,
+		config.SMSService.AccountSid, config.SMSService.AuthToken)
+
+	nController := notificationController.NewController(pgDb)
 	pController := profile.NewController(pgDb)
 	authController := auth.NewController(
 		pgDb,
-		config.SMSService.FromNumber,
-		config.SMSService.AccountSid,
-		config.SMSService.AuthToken,
+		twilioApi,
 		emailClient,
 		tokenAuth,
 	)
@@ -151,7 +152,7 @@ func start(ctx context.Context) error {
 		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))
 
 		r.Route(nController.MainRoute(), func(r chi.Router) {
-			r.Post(notification.SubscribeRoute, controller.Route(nController, notification.SubscribeRoute))
+			r.Post(notificationController.SubscribeRoute, controller.Route(nController, notificationController.SubscribeRoute))
 		})
 	})
 
@@ -170,7 +171,7 @@ func start(ctx context.Context) error {
 
 	log.Printf("http: Server listen: %s", host)
 
-	n, err := notificator.NewFirebaseNotificator(ctx, config.Firebase.WithCredentialsFile, config.Firebase.ProjectId)
+	n, err := firebase.NewClient(ctx, config.Firebase.WithCredentialsFile, config.Firebase.ProjectId)
 	if err != nil {
 		return err
 	}

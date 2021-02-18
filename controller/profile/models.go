@@ -11,7 +11,7 @@ type MyProfile struct {
 	Name        string `json:"name"`
 	Username    string `json:"username"`
 	PhoneNumber string `json:"phoneNumber"`
-	Email       string `json:"email"`
+	Email       string `json:"notification"`
 	IsMigratory bool   `json:"isMigratory"`
 	AvatarExt   string `json:"avatarExt"`
 	LastUpdate  int64  `json:"lastUpdate"`

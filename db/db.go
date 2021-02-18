@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	"fractapp-server/types"
+	"fractapp-server/notification"
 
 	"github.com/go-pg/pg/v10"
 )
@@ -14,7 +14,7 @@ var (
 type DB interface {
 	SubscribersCountByToken(token string) (int, error)
 	SubscriberByAddress(address string) (*Subscriber, error)
-	AuthByValue(value string, codeType types.CodeType, checkType types.CheckType) (*Auth, error)
+	AuthByValue(value string, codeType notification.NotificatorType, checkType notification.CheckType) (*Auth, error)
 	AddressesById(id string) ([]Address, error)
 	ProfileById(id string) (*Profile, error)
 	ProfileByAddress(address string) (*Profile, error)

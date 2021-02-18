@@ -75,7 +75,7 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 	case MyMatchContactsRoute:
 		return c.myMatchContacts, nil
 	case UploadContactsRoute:
-		return c.uploadMyContact, nil
+		return c.uploadMyContacts, nil
 	case InfoRoute:
 		return c.profile, nil
 	}
@@ -92,9 +92,7 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 }
 
 func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
-	value := r.URL.Query().Get("value")
-	value = strings.Trim(strings.ToLower(value), " ")
-
+	value := strings.Trim(strings.ToLower(r.URL.Query().Get("value")), " ")
 	searchType := r.URL.Query().Get("type")
 
 	var users []UserProfileShort
@@ -103,8 +101,8 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		w.Write(b)
 
+		w.Write(b)
 		return nil
 	}
 
@@ -155,11 +153,8 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 func (c *Controller) profile(w http.ResponseWriter, r *http.Request) error {
-	id := r.URL.Query().Get("id")
-	id = strings.Trim(id, " ")
-
-	address := r.URL.Query().Get("address")
-	address = strings.Trim(address, " ")
+	id := strings.Trim(r.URL.Query().Get("id"), " ")
+	address := strings.Trim(r.URL.Query().Get("address"), " ")
 
 	var p *db.Profile
 	var err error
@@ -261,19 +256,17 @@ func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error
 		if isExist {
 			return UsernameIsExistErr
 		}
-
 		profile.Username = rq.Username
-		profile.LastUpdate = sec
 	}
 
 	if profile.Name != rq.Name {
 		if !validators.IsValidName(rq.Name) {
 			return InvalidPropertyErr
 		}
-
 		profile.Name = rq.Name
-		profile.LastUpdate = sec
 	}
+
+	profile.LastUpdate = sec
 
 	err = c.db.UpdateByPK(profile)
 	if err != nil {
@@ -291,7 +284,6 @@ func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	extension := r.FormValue("format")
-
 	if extension != "image/jpeg" && extension != "image/jpg" && extension != "image/png" {
 		return InvalidFileFormatErr
 	}
@@ -313,23 +305,13 @@ func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	fileName := path + AvatarDir + "/" + id + "." + ex[1]
-	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
 
-	err = file.Truncate(0)
-	if err != nil {
-		return err
-	}
-
-	_, err = file.Write(decoded)
+	err = utils.WriteAvatar(fileName, decoded)
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
-	sec := now.Unix()
 
 	profile, err := c.db.ProfileById(id)
 	if err != nil {
@@ -337,7 +319,7 @@ func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	profile.AvatarExt = ex[1]
-	profile.LastUpdate = sec
+	profile.LastUpdate = now.Unix()
 	err = c.db.UpdateByPK(profile)
 	if err != nil {
 		return err
@@ -417,7 +399,7 @@ func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) err
 
 	return nil
 }
-func (c *Controller) uploadMyContact(w http.ResponseWriter, r *http.Request) error {
+func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
@@ -447,7 +429,7 @@ func (c *Controller) uploadMyContact(w http.ResponseWriter, r *http.Request) err
 
 	var myContacts []db.Contact
 	for _, v := range contacts {
-		if !utils.ValidatePhoneNumber(v) {
+		if !validators.IsValidatePhoneNumber(v) {
 			continue
 		}
 		if _, ok := existContactsMap[v]; ok {
@@ -471,7 +453,7 @@ func (c *Controller) uploadMyContact(w http.ResponseWriter, r *http.Request) err
 }
 
 func (c *Controller) findUsername(w http.ResponseWriter, r *http.Request) error {
-	exist, err := c.usernameIsExist(strings.ToLower(r.URL.Query()["username"][0]))
+	exist, err := c.usernameIsExist(strings.ToLower(r.URL.Query().Get("username")))
 	if err != nil {
 		return err
 	}

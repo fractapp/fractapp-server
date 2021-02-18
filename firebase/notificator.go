@@ -1,4 +1,4 @@
-package notificator
+package firebase
 
 import (
 	"context"
@@ -13,25 +13,24 @@ import (
 	firebase "firebase.google.com/go"
 )
 
+type TxType int
+
 const (
 	Sent TxType = iota
 	Received
 )
 
-type TxType int
-
-type Notificator interface {
+type TxNotificator interface {
 	Notify(msg string, token string) error
 	Msg(member string, txType TxType, amount float64, currency types.Currency) string
 }
 
-type FirebaseNotificator struct {
+type Client struct {
 	ctx       context.Context
 	msgClient *messaging.Client
 }
 
-func NewFirebaseNotificator(ctx context.Context, credentialsFile string, projectId string) (*FirebaseNotificator, error) {
-	// Initialize the default app
+func NewClient(ctx context.Context, credentialsFile string, projectId string) (*Client, error) {
 	opt := option.WithCredentialsFile(credentialsFile)
 	config := &firebase.Config{ProjectID: projectId}
 	app, err := firebase.NewApp(context.Background(), config, opt)
@@ -43,13 +42,13 @@ func NewFirebaseNotificator(ctx context.Context, credentialsFile string, project
 		return nil, err
 	}
 
-	return &FirebaseNotificator{
+	return &Client{
 		ctx:       ctx,
 		msgClient: msg,
 	}, nil
 }
 
-func (n *FirebaseNotificator) Notify(msg string, token string) error {
+func (n *Client) Notify(msg string, token string) error {
 	n.msgClient.Send(n.ctx, &messaging.Message{
 		Notification: &messaging.Notification{
 			Body: msg,
@@ -59,7 +58,7 @@ func (n *FirebaseNotificator) Notify(msg string, token string) error {
 	return nil
 }
 
-func (n *FirebaseNotificator) Msg(member string, txType TxType, amount float64, currency types.Currency) string {
+func (n *Client) Msg(member string, txType TxType, amount float64, currency types.Currency) string {
 	switch txType {
 	case Sent:
 		return fmt.Sprintf("You sent %.3f %s to %s", amount, currency.String(), member)

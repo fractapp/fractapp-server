@@ -1,0 +1,31 @@
+{
+  "SubstrateUrls": {
+    "Polkadot": "polkadotUrlTest",
+    "Kusama": "kusamaUrlTest"
+  },
+  "Firebase": {
+    "ProjectId": "projectId",
+    "WithCredentialsFile": "credential"
+  },
+  "SMSService": {
+    "FromNumber": "number",
+    "AccountSid": "sid",
+    "AuthToken": "auth"
+  },
+  "DB": {
+    "Host": "host",
+    "User": "user",
+    "Password": "password",
+    "Database": "database"
+  },
+  "Secret": "secret",
+  "SMTP": {
+    "Host": "host",
+    "Password": "password",
+    "From": {
+      "Name": "name",
+      "Address": "address"
+    }
+  }
+}
+

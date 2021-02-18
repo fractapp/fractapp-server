@@ -1,18 +1,21 @@
 package auth
 
-import "fractapp-server/types"
+import (
+	"fractapp-server/notification"
+	"fractapp-server/types"
+)
 
 type TokenRs struct {
 	Token string `json:"token"`
 }
 type SendCodeRq struct {
-	Type      types.CodeType
-	CheckType types.CheckType
+	Type      notification.NotificatorType
+	CheckType notification.CheckType
 	Value     string
 }
 type ConfirmRegRq struct {
 	Value     string
-	Type      types.CodeType
+	Type      notification.NotificatorType
 	Addresses map[types.Network]Address
 	Code      string
 }
