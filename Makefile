@@ -2,6 +2,7 @@
 updateMocks:
 	@${GOPATH}/bin/mockgen --source $(CURDIR)/db/db.go --destination $(CURDIR)/mocks/db_mock.go --package mocks
 	@${GOPATH}/bin/mockgen --source $(CURDIR)/notification/notificator.go --destination $(CURDIR)/mocks/notificator_mock.go --package mocks
+	@${GOPATH}/bin/mockgen --source $(CURDIR)/firebase/notificator.go --destination $(CURDIR)/mocks/firebase_mock.go --package mocks
 	@echo 'Mocks are updated'
 
 coverage:

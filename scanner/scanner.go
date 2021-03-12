@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/big"
 
+	"github.com/centrifuge/go-substrate-rpc-client/v2/rpc/chain"
+
 	dbType "fractapp-server/types"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v2"
@@ -48,31 +50,34 @@ func (s *EventScanner) Start() error {
 
 	var lastHeight uint64
 	for {
-		select {
-		case newHeader := <-newBlockEvent.Chan():
-			blockNumber := uint64(newHeader.Number)
-			if lastHeight > blockNumber {
-				continue
-			}
-			err := s.scanBlock(api, blockNumber)
-			if err != nil {
-				log.Printf("%s: Error scan block: %s \n", s.prefix, err.Error())
-			}
-			lastHeight = blockNumber
-		case err := <-newBlockEvent.Err():
-			log.Printf("%s: Error substrate rpc: %s \n", s.prefix, err.Error())
-			log.Printf("%s: Repeated subscribe new block \n", s.prefix)
-
-			newBlockEvent.Unsubscribe()
-			newBlockEvent, err = api.RPC.Chain.SubscribeFinalizedHeads()
-			if err != nil {
-				log.Printf("%s: Error repeated subscribe: %s \n", s.prefix, err.Error())
-			}
-			continue
-		}
+		lastHeight = s.scanNewHeight(lastHeight, api, newBlockEvent)
 	}
 }
 
+func (s *EventScanner) scanNewHeight(lastHeight uint64, api *gsrpc.SubstrateAPI, newBlockEvent *chain.FinalizedHeadsSubscription) uint64 {
+	select {
+	case newHeader := <-newBlockEvent.Chan():
+		blockNumber := uint64(newHeader.Number)
+		if lastHeight > blockNumber {
+			return lastHeight
+		}
+		err := s.scanBlock(api, blockNumber)
+		if err != nil {
+			log.Printf("%s: Error scan block: %s \n", s.prefix, err.Error())
+		}
+		return blockNumber
+	case err := <-newBlockEvent.Err():
+		log.Printf("%s: Error substrate rpc: %s \n", s.prefix, err.Error())
+		log.Printf("%s: Repeated subscribe new block \n", s.prefix)
+
+		newBlockEvent.Unsubscribe()
+		newBlockEvent, err = api.RPC.Chain.SubscribeFinalizedHeads()
+		if err != nil {
+			log.Printf("%s: Error repeated subscribe: %s \n", s.prefix, err.Error())
+		}
+		return lastHeight
+	}
+}
 func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 	log.Printf("%s: Scan new block: %d \n", s.prefix, number)
 
