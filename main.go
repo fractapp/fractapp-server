@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"fractapp-server/adaptors"
 	"fractapp-server/config"
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
@@ -177,9 +178,10 @@ func start(ctx context.Context) error {
 	}
 	for k, url := range config.SubstrateUrls {
 		network := types.ParseNetwork(k)
-		es := scanner.NewEventScanner(url, pgDb, network.String(), network, n)
+		adaptor := adaptors.NewSubstrateAdaptor(url, network)
+		bs := scanner.NewBlockScanner(pgDb, network.String(), network, n, adaptor)
 		go func() {
-			err = es.Start()
+			err = bs.Start()
 			if err != nil {
 				log.Printf("%s scanner down: %s \n", network.String(), err)
 			}
