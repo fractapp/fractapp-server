@@ -6,9 +6,6 @@ updateMocks:
 	@${GOPATH}/bin/mockgen --source $(CURDIR)/adaptors/adaptor.go --destination $(CURDIR)/mocks/adaptor_mock.go --package mocks
 	@echo 'Mocks are updated'
 
-coverage:
-	go test ./... -coverprofile=c.out
-
 totalCoverage:
 	go test ./... -coverprofile=c.out
 	go tool cover -func c.out | grep total

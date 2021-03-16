@@ -14,6 +14,7 @@ import (
 	notificationController "fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
+	"fractapp-server/docs"
 	"fractapp-server/firebase"
 	"fractapp-server/notification"
 	"fractapp-server/scanner"
@@ -23,6 +24,8 @@ import (
 	"os"
 	"os/signal"
 	"time"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -38,6 +41,24 @@ func init() {
 	flag.StringVar(&configPath, "config", configPath, "config file")
 	flag.Parse()
 }
+
+// @contact.name Support
+// @contact.email support@fractapp.com
+// @license.name Apache 2.0
+// @license.url https://github.com/fractapp/fractapp-server/blob/main/LICENSE
+// @termsOfService https://fractapp.com/legal/tos.pdf
+
+// @securityDefinitions.apikey AuthWithPubKey-SignTimestamp
+// @in header
+// @name Sign-Timestamp
+
+// @securityDefinitions.apikey AuthWithPubKey-Sign
+// @in header
+// @name Sign
+
+// @securityDefinitions.apikey AuthWithPubKey-Auth-Key
+// @in header
+// @name Auth-Key
 
 func main() {
 	ctx := context.Background()
@@ -109,6 +130,17 @@ func start(ctx context.Context) error {
 	)
 
 	authMiddleware := internalMiddleware.New(pgDb)
+
+	// programmatically set swagger info
+	docs.SwaggerInfo.Title = "Swagger Fractapp Server API"
+	docs.SwaggerInfo.Description = "This is Fractapp server. Auth with pub key mechanism described here: "
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = host
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL(host+"/swagger/doc.json"),
+	))
 
 	r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 	r.Group(func(r chi.Router) {

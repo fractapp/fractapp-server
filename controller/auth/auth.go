@@ -99,6 +99,20 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	}
 }
 
+// sendCode godoc
+// @Summary Send code
+// @Description send auth code to email/phone
+// @ID send-auth-code
+// @Tags auth
+// @Accept  json
+// @Produce  json
+// @Param rq body SendCodeRq true "Send code rq"
+// @Success 200
+// @Failure 404 string notification.InvalidPhoneNumberErr
+// @Failure 404 string notification.InvalidEmailErr:
+// @Failure 202 string InvalidSendTimeoutErr
+// @Failure 400
+// @Router /auth/sendCode [post]
 func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -168,13 +182,33 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 
 	return nil
 }
+
+// signIn godoc
+// @Summary Sign in
+// @Description sign in to fractapp account
+// @ID signIn
+// @Security AuthWithPubKey-SignTimestamp
+// @Security AuthWithPubKey-Sign
+// @Security AuthWithPubKey-Auth-Key
+// @Tags auth
+// @Accept  json
+// @Produce  json
+// @Param rq body ConfirmAuthRq true "Confirm auth rq"
+// @Success 200
+// @Failure 429 string CodeExpiredErr
+// @Failure 429 string CodeUsedErr
+// @Failure 429 string InvalidNumberOfAttemptsErr
+// @Failure 403 string AddressExistErr
+// @Failure 403 string AccountExistErr
+// @Failure 400
+// @Router /auth/signIn [post]
 func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 
-	rq := &ConfirmRegRq{}
+	rq := &ConfirmAuthRq{}
 	err = json.Unmarshal(b, rq)
 	if err != nil {
 		return err
@@ -282,6 +316,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 
 	return nil
 }
+
 func (c *Controller) confirm(value string, codeType notification.NotificatorType, checkType notification.CheckType, code string) error {
 	auth, err := c.db.AuthByValue(value, codeType, checkType)
 	if err != nil {
@@ -315,7 +350,7 @@ func (c *Controller) confirm(value string, codeType notification.NotificatorType
 
 	return nil
 }
-func (c *Controller) checkAddresses(rq *ConfirmRegRq, authPubKey string, rqTime time.Time, profile *db.Profile) error {
+func (c *Controller) checkAddresses(rq *ConfirmAuthRq, authPubKey string, rqTime time.Time, profile *db.Profile) error {
 	if len(rq.Addresses) != 2 {
 		return controller.InvalidRqErr
 	}

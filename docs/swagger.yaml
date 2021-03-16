@@ -1,0 +1,139 @@
+definitions:
+  auth.Address:
+    properties:
+      address:
+        description: Blockchain address from account
+        type: string
+      pubKey:
+        description: PubKey from account
+        type: string
+      sign:
+        description: Sign for message "It is my fractapp rq:{rqJson}{timestamp}"
+        type: string
+    type: object
+  auth.ConfirmAuthRq:
+    properties:
+      addresses:
+        additionalProperties:
+          $ref: '#/definitions/auth.Address'
+        description: Addresses from account
+        type: object
+      code:
+        description: The code that was sent
+        type: string
+      type:
+        description: Message type with code (0 - sms / 1 - email)
+        enum:
+        - 0
+        - 1
+        type: integer
+      value:
+        description: Email address or Phone number
+        type: string
+    type: object
+  auth.SendCodeRq:
+    properties:
+      checkType:
+        description: Now it is always zero. But in future it will have more types.
+        enum:
+        - 0
+        type: integer
+      type:
+        description: Message type (0 - sms / 1 - email)
+        enum:
+        - 0
+        - 1
+        type: integer
+      value:
+        description: Email address or Phone number
+        type: string
+    type: object
+info:
+  contact:
+    email: support@fractapp.com
+    name: Support
+  license:
+    name: Apache 2.0
+    url: https://github.com/fractapp/fractapp-server/blob/main/LICENSE
+  termsOfService: https://fractapp.com/legal/tos.pdf
+paths:
+  /auth/sendCode:
+    post:
+      consumes:
+      - application/json
+      description: send auth code to email/phone
+      operationId: send-auth-code
+      parameters:
+      - description: Send code rq
+        in: body
+        name: rq
+        required: true
+        schema:
+          $ref: '#/definitions/auth.SendCodeRq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "202":
+          description: Accepted
+          schema:
+            type: string
+        "400":
+          description: ""
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      summary: Send code
+      tags:
+      - auth
+  /auth/signIn:
+    post:
+      consumes:
+      - application/json
+      description: sign in to fractapp account
+      operationId: signIn
+      parameters:
+      - description: Confirm auth rq
+        in: body
+        name: rq
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ConfirmAuthRq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: ""
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "429":
+          description: Too Many Requests
+          schema:
+            type: string
+      security:
+      - AuthWithPubKey-SignTimestamp: []
+      - AuthWithPubKey-Sign: []
+      - AuthWithPubKey-Auth-Key: []
+      summary: Sign in
+      tags:
+      - auth
+securityDefinitions:
+  AuthWithPubKey-Auth-Key:
+    in: header
+    name: Auth-Key
+    type: apiKey
+  AuthWithPubKey-Sign:
+    in: header
+    name: Sign
+    type: apiKey
+  AuthWithPubKey-SignTimestamp:
+    in: header
+    name: Sign-Timestamp
+    type: apiKey
+swagger: "2.0"

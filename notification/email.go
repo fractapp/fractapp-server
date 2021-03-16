@@ -13,7 +13,7 @@ import (
 
 var (
 	InvalidSendEmailErr = errors.New("invalid send notification")
-	InvalidEmailErr     = errors.New("invalid notification address")
+	InvalidEmailErr     = errors.New("invalid email address")
 )
 
 const (

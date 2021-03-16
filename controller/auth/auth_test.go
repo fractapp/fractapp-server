@@ -543,7 +543,7 @@ func TestSignForNewUser(t *testing.T) {
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	code := "111111"
-	rq := ConfirmRegRq{
+	rq := ConfirmAuthRq{
 		Value: "phoneNumber",
 		Type:  notification.SMS,
 		Addresses: map[types.Network]Address{
@@ -644,7 +644,7 @@ func TestSignForInvalidSignTimestamp(t *testing.T) {
 	c := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	code := "111111"
-	rq := ConfirmRegRq{
+	rq := ConfirmAuthRq{
 		Value: "phoneNumber",
 		Type:  notification.SMS,
 		Addresses: map[types.Network]Address{
@@ -705,7 +705,7 @@ func TestSignForExistUser(t *testing.T) {
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	code := "111111"
-	rq := ConfirmRegRq{
+	rq := ConfirmAuthRq{
 		Value: "email",
 		Type:  notification.Email,
 		Addresses: map[types.Network]Address{
