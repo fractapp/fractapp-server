@@ -52,6 +52,17 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	}
 }
 
+// subscribe godoc
+// @Summary Subscribe
+// @Description subscribe for notifications about transaction
+// @ID subscribe
+// @Tags Notification
+// @Accept  json
+// @Produce json
+// @Param rq body UpdateTokenRq true "update token request"
+// @Success 200
+// @Failure 400 {string} string
+// @Router /notification/subscribe [post]
 func (c *Controller) subscribe(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {

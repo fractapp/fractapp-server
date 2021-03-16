@@ -103,15 +103,15 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 // @Summary Send code
 // @Description send auth code to email/phone
 // @ID send-auth-code
-// @Tags auth
+// @Tags Authorization
 // @Accept  json
 // @Produce  json
 // @Param rq body SendCodeRq true "Send code rq"
 // @Success 200
-// @Failure 404 string notification.InvalidPhoneNumberErr
-// @Failure 404 string notification.InvalidEmailErr:
-// @Failure 202 string InvalidSendTimeoutErr
-// @Failure 400
+// @Failure 404 {string} string notification.InvalidPhoneNumberErr
+// @Failure 404 {string} string notification.InvalidEmailErr:
+// @Failure 202 {string} string InvalidSendTimeoutErr
+// @Failure 400 {string} string
 // @Router /auth/sendCode [post]
 func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
@@ -190,17 +190,17 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 // @Security AuthWithPubKey-SignTimestamp
 // @Security AuthWithPubKey-Sign
 // @Security AuthWithPubKey-Auth-Key
-// @Tags auth
+// @Tags Authorization
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Param rq body ConfirmAuthRq true "Confirm auth rq"
-// @Success 200
-// @Failure 429 string CodeExpiredErr
-// @Failure 429 string CodeUsedErr
-// @Failure 429 string InvalidNumberOfAttemptsErr
-// @Failure 403 string AddressExistErr
-// @Failure 403 string AccountExistErr
-// @Failure 400
+// @Success 200 {object} TokenRs
+// @Failure 429 {string} string CodeExpiredErr
+// @Failure 429 {string} string CodeUsedErr
+// @Failure 429 {string} string InvalidNumberOfAttemptsErr
+// @Failure 403 {string} string AddressExistErr
+// @Failure 403 {string} string AccountExistErr
+// @Failure 400 {string} string
 // @Router /auth/signIn [post]
 func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)

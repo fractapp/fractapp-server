@@ -8,7 +8,7 @@ definitions:
         description: PubKey from account
         type: string
       sign:
-        description: Sign for message "It is my fractapp rq:{rqJson}{timestamp}"
+        description: 'Sign for message (more information here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md)'
         type: string
     type: object
   auth.ConfirmAuthRq:
@@ -16,7 +16,7 @@ definitions:
       addresses:
         additionalProperties:
           $ref: '#/definitions/auth.Address'
-        description: Addresses from account
+        description: Addresses by network (0 - polkadot/ 1 - kusama) from account
         type: object
       code:
         description: The code that was sent
@@ -28,7 +28,7 @@ definitions:
         - 1
         type: integer
       value:
-        description: Email address or Phone number
+        description: Email address or Phone number (without +)
         type: string
     type: object
   auth.SendCodeRq:
@@ -45,7 +45,87 @@ definitions:
         - 1
         type: integer
       value:
-        description: Email address or Phone number
+        description: Email address or Phone number (without +)
+        type: string
+    type: object
+  auth.TokenRs:
+    properties:
+      token:
+        description: JWT token
+        type: string
+    type: object
+  notification.UpdateTokenRq:
+    properties:
+      address:
+        description: Blockchain address
+        type: string
+      network:
+        description: network id (0 - polkadot/ 1 - kusama) from address
+        type: integer
+      pubKey:
+        description: Public key from address
+        type: string
+      sign:
+        description: 'signature for message (more information here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md)'
+        type: string
+      timestamp:
+        description: timestamp from message
+        type: integer
+      token:
+        description: firebase token
+        type: string
+    type: object
+  profile.MyProfile:
+    properties:
+      avatarExt:
+        description: avatar format (png/jpg/jpeg)
+        type: string
+      id:
+        description: id from info
+        type: string
+      isMigratory:
+        description: always false. This property is for the future
+        type: boolean
+      lastUpdate:
+        description: timestamp of the last info update
+        type: integer
+      name:
+        description: name in fractapp
+        type: string
+      notification:
+        type: string
+      phoneNumber:
+        type: string
+      username:
+        description: username in fractapp
+        type: string
+    type: object
+  profile.ShortUserProfile:
+    properties:
+      addresses:
+        additionalProperties:
+          type: string
+        description: String addresses by network (0 - polkadot/ 1 - kusama) from account
+        type: object
+      avatarExt:
+        description: avatar format (png/jpg/jpeg)
+        type: string
+      id:
+        description: id from info
+        type: string
+      lastUpdate:
+        description: timestamp of the last info update
+        type: integer
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  profile.UpdateProfileRq:
+    properties:
+      name:
+        type: string
+      username:
         type: string
     type: object
 info:
@@ -80,14 +160,16 @@ paths:
           schema:
             type: string
         "400":
-          description: ""
+          description: Bad Request
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
             type: string
       summary: Send code
       tags:
-      - auth
+      - Authorization
   /auth/signIn:
     post:
       consumes:
@@ -105,9 +187,13 @@ paths:
       - application/json
       responses:
         "200":
-          description: ""
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenRs'
         "400":
-          description: ""
+          description: Bad Request
+          schema:
+            type: string
         "403":
           description: Forbidden
           schema:
@@ -122,8 +208,278 @@ paths:
       - AuthWithPubKey-Auth-Key: []
       summary: Sign in
       tags:
-      - auth
+      - Authorization
+  /notification/subscribe:
+    post:
+      consumes:
+      - application/json
+      description: subscribe for notifications about transaction
+      operationId: subscribe
+      parameters:
+      - description: update token request
+        in: body
+        name: rq
+        required: true
+        schema:
+          $ref: '#/definitions/notification.UpdateTokenRq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Subscribe
+      tags:
+      - Notification
+  /profile/contacts:
+    get:
+      consumes:
+      - application/json
+      operationId: myContacts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - AuthWithJWT: []
+      summary: Get my contacts
+      tags:
+      - Profile
+  /profile/info:
+    get:
+      consumes:
+      - application/json
+      description: get user by id or blockchain address
+      operationId: info
+      parameters:
+      - description: get user profile by user id
+        in: query
+        name: id
+        type: string
+      - description: get user profile by blockchain address
+        in: query
+        name: address
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.ShortUserProfile'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get user
+      tags:
+      - Profile
+  /profile/matchContacts:
+    get:
+      consumes:
+      - application/json
+      description: Only those who are in your contacts can see your profile by phone
+        number. Your number should also be in their contacts.
+      operationId: myMatchContacts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - AuthWithJWT: []
+      summary: Get my matched contacts
+      tags:
+      - Profile
+  /profile/my:
+    get:
+      consumes:
+      - application/json
+      operationId: myProfile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.MyProfile'
+        "400":
+          description: ""
+      security:
+      - AuthWithJWT: []
+      summary: Get my profile
+      tags:
+      - Profile
+  /profile/search:
+    get:
+      consumes:
+      - application/json
+      description: search user by email or username
+      operationId: search
+      parameters:
+      - description: username or email value
+        in: query
+        name: value
+        required: true
+        type: string
+      - description: email/username
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/profile.ShortUserProfile'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: ""
+      summary: Search user
+      tags:
+      - Profile
+  /profile/updateProfile:
+    post:
+      consumes:
+      - application/json
+      operationId: updateProfile
+      parameters:
+      - description: update profile model
+        in: body
+        name: rq
+        required: true
+        schema:
+          $ref: '#/definitions/profile.UpdateProfileRq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - AuthWithJWT: []
+      summary: Update my profile
+      tags:
+      - Profile
+  /profile/uploadAvatar:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      operationId: uploadAvatar
+      parameters:
+      - description: image/jpeg or image/jpg or image/png
+        in: formData
+        name: format
+        required: true
+        type: string
+      - description: avatar in base64 (https://onlinepngtools.com/convert-png-to-base64)
+        in: formData
+        name: avatar
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - AuthWithJWT: []
+      summary: Update avatar
+      tags:
+      - Profile
+  /profile/uploadContacts:
+    post:
+      consumes:
+      - application/json
+      operationId: uploadMyContacts
+      parameters:
+      - description: phone numbers of contacts
+        in: body
+        name: rq
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - AuthWithJWT: []
+      summary: Upload my phone numbers of contacts
+      tags:
+      - Profile
+  /profile/username:
+    get:
+      consumes:
+      - application/json
+      operationId: username
+      parameters:
+      - description: username min length 4
+        in: query
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      summary: Is username exist?
+      tags:
+      - Profile
 securityDefinitions:
+  AuthWithJWT:
+    in: header
+    name: Authorization
+    type: apiKey
   AuthWithPubKey-Auth-Key:
     in: header
     name: Auth-Key

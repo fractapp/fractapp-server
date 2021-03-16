@@ -56,3 +56,9 @@ It is my firebase token for fractapp:{firebaseToken}{timestamp}
 ```
 
 For this request not need to use the algorithm from the "Authorization With Auth Public Key" section.
+
+## JWT Auth
+JWT Auth use the header "Authorization" and has format:
+```
+BEARER {jwt token}
+```

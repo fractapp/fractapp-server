@@ -77,13 +77,23 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 	case UploadContactsRoute:
 		return c.uploadMyContacts, nil
 	case InfoRoute:
-		return c.profile, nil
+		return c.info, nil
 	}
 
 	return nil, controller.InvalidRouteErr
 }
 func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	switch err {
+	case db.ErrNoRows:
+		http.Error(w, "", http.StatusNotFound)
+	case InvalidFileFormatErr:
+		fallthrough
+	case InvalidFileSizeErr:
+		fallthrough
+	case UsernameIsExistErr:
+		fallthrough
+	case InvalidPropertyErr:
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	case UsernameNotFoundErr:
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
@@ -91,11 +101,24 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	}
 }
 
+// search godoc
+// @Summary Search user
+// @Description search user by email or username
+// @ID search
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param value query string true "username or email value"
+// @Param type query string false "email/username"
+// @Success 200 {object} []ShortUserProfile
+// @Failure 400 {string} string
+// @Failure 404
+// @Router /profile/search [get]
 func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 	value := strings.Trim(strings.ToLower(r.URL.Query().Get("value")), " ")
 	searchType := r.URL.Query().Get("type")
 
-	var users []UserProfileShort
+	users := make([]ShortUserProfile, 0)
 	if len(value) < MinSearchLength {
 		b, err := json.Marshal(&users)
 		if err != nil {
@@ -128,7 +151,7 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 			continue
 		}
 
-		user := UserProfileShort{
+		user := ShortUserProfile{
 			Id:         v.Id,
 			Name:       v.Name,
 			Username:   v.Username,
@@ -152,7 +175,20 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 	w.Write(b)
 	return nil
 }
-func (c *Controller) profile(w http.ResponseWriter, r *http.Request) error {
+
+// info godoc
+// @Summary Get user
+// @Description get user by id or blockchain address
+// @ID info
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param id query string false "get user profile by user id"
+// @Param address query string false "get user profile by blockchain address"
+// @Success 200 {object} ShortUserProfile
+// @Failure 400 {string} string
+// @Router /profile/info [get]
+func (c *Controller) info(w http.ResponseWriter, r *http.Request) error {
 	id := strings.Trim(r.URL.Query().Get("id"), " ")
 	address := strings.Trim(r.URL.Query().Get("address"), " ")
 
@@ -174,7 +210,7 @@ func (c *Controller) profile(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	user := UserProfileShort{
+	user := ShortUserProfile{
 		Id:         p.Id,
 		Name:       p.Name,
 		Username:   p.Username,
@@ -195,6 +231,17 @@ func (c *Controller) profile(w http.ResponseWriter, r *http.Request) error {
 	w.Write(b)
 	return nil
 }
+
+// myProfile godoc
+// @Summary Get my profile
+// @Security AuthWithJWT
+// @ID myProfile
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Success 200 {object} MyProfile
+// @Failure 400
+// @Router /profile/my [get]
 func (c *Controller) myProfile(w http.ResponseWriter, r *http.Request) error {
 	id := middleware.AuthId(r)
 
@@ -226,6 +273,17 @@ func (c *Controller) myProfile(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// updateProfile godoc
+// @Summary Update my profile
+// @Security AuthWithJWT
+// @ID updateProfile
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param rq body UpdateProfileRq true "update profile model"
+// @Success 200
+// @Failure 400 {string} string
+// @Router /profile/updateProfile [post]
 func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -275,6 +333,19 @@ func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error
 
 	return nil
 }
+
+// uploadAvatar godoc
+// @Summary Update avatar
+// @Security AuthWithJWT
+// @ID uploadAvatar
+// @Tags Profile
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param format formData string true "image/jpeg or image/jpg or image/png"
+// @Param avatar formData string true "avatar in base64 (https://onlinepngtools.com/convert-png-to-base64)"
+// @Success 200
+// @Failure 400 {string} string
+// @Router /profile/uploadAvatar [post]
 func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error {
 	base64File := r.FormValue("avatar")
 
@@ -328,6 +399,16 @@ func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// myContacts godoc
+// @Summary Get my contacts
+// @Security AuthWithJWT
+// @ID myContacts
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Success 200 {object} []string
+// @Failure 400 {string} string
+// @Router /profile/contacts [get]
 func (c *Controller) myContacts(w http.ResponseWriter, r *http.Request) error {
 	id := middleware.AuthId(r)
 
@@ -352,6 +433,18 @@ func (c *Controller) myContacts(w http.ResponseWriter, r *http.Request) error {
 
 	return nil
 }
+
+// myMatchContacts godoc
+// @Summary Get my matched contacts
+// @Description Only those who are in your contacts can see your profile by phone number. Your number should also be in their contacts.
+// @Security AuthWithJWT
+// @ID myMatchContacts
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Success 200 {object} []string
+// @Failure 400 {string} string
+// @Router /profile/matchContacts [get]
 func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) error {
 	id := middleware.AuthId(r)
 	p, err := c.db.ProfileById(id)
@@ -364,14 +457,14 @@ func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 
-	var users []UserProfileShort
+	var users []ShortUserProfile
 	for _, v := range matchContacts {
 		addresses, err := c.db.AddressesById(v.Id)
 		if err != nil {
 			continue
 		}
 
-		user := UserProfileShort{
+		user := ShortUserProfile{
 			Id:         v.Id,
 			Name:       v.Name,
 			Username:   v.Username,
@@ -399,6 +492,18 @@ func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) err
 
 	return nil
 }
+
+// uploadMyContacts godoc
+// @Summary Upload my phone numbers of contacts
+// @Security AuthWithJWT
+// @ID uploadMyContacts
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param rq body []string true "phone numbers of contacts"
+// @Success 200
+// @Failure 400 {string} string
+// @Router /profile/uploadContacts [post]
 func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -452,6 +557,17 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+// username godoc
+// @Summary Is username exist?
+// @ID username
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param username query string true "username min length 4"
+// @Success 200
+// @Failure 404 {string} string
+// @Failure 400 {string} string
+// @Router /profile/username [get]
 func (c *Controller) findUsername(w http.ResponseWriter, r *http.Request) error {
 	exist, err := c.usernameIsExist(strings.ToLower(r.URL.Query().Get("username")))
 	if err != nil {

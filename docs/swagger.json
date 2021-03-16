@@ -22,7 +22,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authorization"
                 ],
                 "summary": "Send code",
                 "operationId": "send-auth-code",
@@ -48,7 +48,10 @@
                         }
                     },
                     "400": {
-                        "description": ""
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "404": {
                         "description": "Not Found",
@@ -80,7 +83,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authorization"
                 ],
                 "summary": "Sign in",
                 "operationId": "signIn",
@@ -97,10 +100,16 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.TokenRs"
+                        }
                     },
                     "400": {
-                        "description": ""
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "403": {
                         "description": "Forbidden",
@@ -110,6 +119,420 @@
                     },
                     "429": {
                         "description": "Too Many Requests",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/notification/subscribe": {
+            "post": {
+                "description": "subscribe for notifications about transaction",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Subscribe",
+                "operationId": "subscribe",
+                "parameters": [
+                    {
+                        "description": "update token request",
+                        "name": "rq",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/notification.UpdateTokenRq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/contacts": {
+            "get": {
+                "security": [
+                    {
+                        "AuthWithJWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get my contacts",
+                "operationId": "myContacts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/info": {
+            "get": {
+                "description": "get user by id or blockchain address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get user",
+                "operationId": "info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "get user profile by user id",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "get user profile by blockchain address",
+                        "name": "address",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.ShortUserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/matchContacts": {
+            "get": {
+                "security": [
+                    {
+                        "AuthWithJWT": []
+                    }
+                ],
+                "description": "Only those who are in your contacts can see your profile by phone number. Your number should also be in their contacts.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get my matched contacts",
+                "operationId": "myMatchContacts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/my": {
+            "get": {
+                "security": [
+                    {
+                        "AuthWithJWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get my profile",
+                "operationId": "myProfile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.MyProfile"
+                        }
+                    },
+                    "400": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/profile/search": {
+            "get": {
+                "description": "search user by email or username",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Search user",
+                "operationId": "search",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username or email value",
+                        "name": "value",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "email/username",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/profile.ShortUserProfile"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/profile/updateProfile": {
+            "post": {
+                "security": [
+                    {
+                        "AuthWithJWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Update my profile",
+                "operationId": "updateProfile",
+                "parameters": [
+                    {
+                        "description": "update profile model",
+                        "name": "rq",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/profile.UpdateProfileRq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/uploadAvatar": {
+            "post": {
+                "security": [
+                    {
+                        "AuthWithJWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Update avatar",
+                "operationId": "uploadAvatar",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "image/jpeg or image/jpg or image/png",
+                        "name": "format",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "avatar in base64 (https://onlinepngtools.com/convert-png-to-base64)",
+                        "name": "avatar",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/uploadContacts": {
+            "post": {
+                "security": [
+                    {
+                        "AuthWithJWT": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Upload my phone numbers of contacts",
+                "operationId": "uploadMyContacts",
+                "parameters": [
+                    {
+                        "description": "phone numbers of contacts",
+                        "name": "rq",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/username": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Is username exist?",
+                "operationId": "username",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username min length 4",
+                        "name": "username",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }
@@ -131,7 +554,7 @@
                     "type": "string"
                 },
                 "sign": {
-                    "description": "Sign for message \"It is my fractapp rq:{rqJson}{timestamp}\"",
+                    "description": "Sign for message (more information here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md)",
                     "type": "string"
                 }
             }
@@ -140,7 +563,7 @@
             "type": "object",
             "properties": {
                 "addresses": {
-                    "description": "Addresses from account",
+                    "description": "Addresses by network (0 - polkadot/ 1 - kusama) from account",
                     "type": "object",
                     "additionalProperties": {
                         "$ref": "#/definitions/auth.Address"
@@ -159,7 +582,7 @@
                     ]
                 },
                 "value": {
-                    "description": "Email address or Phone number",
+                    "description": "Email address or Phone number (without +)",
                     "type": "string"
                 }
             }
@@ -183,13 +606,132 @@
                     ]
                 },
                 "value": {
-                    "description": "Email address or Phone number",
+                    "description": "Email address or Phone number (without +)",
+                    "type": "string"
+                }
+            }
+        },
+        "auth.TokenRs": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "description": "JWT token",
+                    "type": "string"
+                }
+            }
+        },
+        "notification.UpdateTokenRq": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "Blockchain address",
+                    "type": "string"
+                },
+                "network": {
+                    "description": "network id (0 - polkadot/ 1 - kusama) from address",
+                    "type": "integer"
+                },
+                "pubKey": {
+                    "description": "Public key from address",
+                    "type": "string"
+                },
+                "sign": {
+                    "description": "signature for message (more information here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md)",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "timestamp from message",
+                    "type": "integer"
+                },
+                "token": {
+                    "description": "firebase token",
+                    "type": "string"
+                }
+            }
+        },
+        "profile.MyProfile": {
+            "type": "object",
+            "properties": {
+                "avatarExt": {
+                    "description": "avatar format (png/jpg/jpeg)",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "id from info",
+                    "type": "string"
+                },
+                "isMigratory": {
+                    "description": "always false. This property is for the future",
+                    "type": "boolean"
+                },
+                "lastUpdate": {
+                    "description": "timestamp of the last info update",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "name in fractapp",
+                    "type": "string"
+                },
+                "notification": {
+                    "type": "string"
+                },
+                "phoneNumber": {
+                    "type": "string"
+                },
+                "username": {
+                    "description": "username in fractapp",
+                    "type": "string"
+                }
+            }
+        },
+        "profile.ShortUserProfile": {
+            "type": "object",
+            "properties": {
+                "addresses": {
+                    "description": "String addresses by network (0 - polkadot/ 1 - kusama) from account",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "avatarExt": {
+                    "description": "avatar format (png/jpg/jpeg)",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "id from info",
+                    "type": "string"
+                },
+                "lastUpdate": {
+                    "description": "timestamp of the last info update",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "profile.UpdateProfileRq": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
         }
     },
     "securityDefinitions": {
+        "AuthWithJWT": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
         "AuthWithPubKey-Auth-Key": {
             "type": "apiKey",
             "name": "Auth-Key",
