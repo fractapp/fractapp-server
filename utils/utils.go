@@ -2,15 +2,13 @@ package utils
 
 import (
 	"errors"
-
-	"regexp"
+	"os"
 
 	"github.com/ChainSafe/go-schnorrkel"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 var (
-	phonePattern   = "^[0-9]*$"
 	InvalidSignErr = errors.New("invalid sign")
 )
 
@@ -71,16 +69,21 @@ func ParsePubKey(hex string) ([32]byte, error) {
 	return pubKey, nil
 }
 
-func ValidatePhoneNumber(phoneNumber string) bool {
-	if len(phoneNumber) > 15 {
-		return false
-	}
-	if phoneNumber[0] != '+' {
-		return false
-	}
-	if v, _ := regexp.MatchString(phonePattern, phoneNumber[1:]); !v {
-		return false
+func WriteAvatar(fileName string, decoded []byte) error {
+	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
 	}
 
-	return true
+	err = file.Truncate(0)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(decoded)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

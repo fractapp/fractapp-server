@@ -1,112 +1,93 @@
 package scanner
 
 import (
+	"fractapp-server/adaptors"
 	"fractapp-server/db"
-	"fractapp-server/notificator"
+	"fractapp-server/firebase"
 	"log"
 	"math/big"
 
 	dbType "fractapp-server/types"
-
-	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v2"
-	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
 )
 
 const addressesLimit = 100000
 
-type EventScanner struct {
-	host        string
+type BlockScanner struct {
 	db          db.DB
 	prefix      string
 	network     dbType.Network
-	notificator notificator.Notificator
+	notificator firebase.TxNotificator
+	adaptor     adaptors.Adaptor
 }
 
-func NewEventScanner(host string, db db.DB, prefix string, network dbType.Network, notificator notificator.Notificator) *EventScanner {
-	return &EventScanner{
-		host:        host,
+func NewBlockScanner(db db.DB, prefix string, network dbType.Network, notificator firebase.TxNotificator, adaptor adaptors.Adaptor) *BlockScanner {
+	return &BlockScanner{
 		db:          db,
 		prefix:      prefix,
 		network:     network,
 		notificator: notificator,
+		adaptor:     adaptor,
 	}
 }
 
-func (s *EventScanner) Start() error {
-	api, err := gsrpc.NewSubstrateAPI(s.host)
+func (s *BlockScanner) Start() error {
+	err := s.adaptor.Connect()
 	if err != nil {
 		return err
 	}
 
 	log.Printf("%s: subscribe new block \n", s.prefix)
-	newBlockEvent, err := api.RPC.Chain.SubscribeFinalizedHeads()
+	err = s.adaptor.Subscribe()
 	if err != nil {
 		return err
 	}
 
-	defer newBlockEvent.Unsubscribe()
+	defer s.adaptor.Unsubscribe()
 
 	var lastHeight uint64
 	for {
-		select {
-		case newHeader := <-newBlockEvent.Chan():
-			blockNumber := uint64(newHeader.Number)
-			if lastHeight > blockNumber {
-				continue
-			}
-			err := s.scanBlock(api, blockNumber)
-			if err != nil {
-				log.Printf("%s: Error scan block: %s \n", s.prefix, err.Error())
-			}
-			lastHeight = blockNumber
-		case err := <-newBlockEvent.Err():
-			log.Printf("%s: Error substrate rpc: %s \n", s.prefix, err.Error())
-			log.Printf("%s: Repeated subscribe new block \n", s.prefix)
-
-			newBlockEvent.Unsubscribe()
-			newBlockEvent, err = api.RPC.Chain.SubscribeFinalizedHeads()
-			if err != nil {
-				log.Printf("%s: Error repeated subscribe: %s \n", s.prefix, err.Error())
-			}
-			continue
-		}
+		lastHeight = s.scanNewHeight(lastHeight)
 	}
 }
 
-func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
+func (s *BlockScanner) scanNewHeight(lastHeight uint64) uint64 {
+	blockNumber, err := s.adaptor.WaitNewBlock()
+	if err != nil {
+		log.Printf("%s: Error substrate rpc: %s \n", s.prefix, err.Error())
+		log.Printf("%s: Repeated subscribe new block \n", s.prefix)
+
+		s.adaptor.Unsubscribe()
+		err = s.adaptor.Subscribe()
+
+		if err != nil {
+			log.Printf("%s: Error repeated subscribe: %s \n", s.prefix, err.Error())
+		}
+		return lastHeight
+	} else {
+		if lastHeight > blockNumber {
+			return lastHeight
+		}
+		err := s.scanBlock(blockNumber)
+		if err != nil {
+			log.Printf("%s: Error scan block: %s \n", s.prefix, err.Error())
+		}
+		return blockNumber
+	}
+}
+
+func (s *BlockScanner) scanBlock(number uint64) error {
 	log.Printf("%s: Scan new block: %d \n", s.prefix, number)
 
-	hash, err := api.RPC.Chain.GetBlockHash(number)
-	if err != nil {
-		return err
-	}
-
-	meta, err := api.RPC.State.GetMetadata(hash)
-	if err != nil {
-		return err
-	}
-
-	key, err := types.CreateStorageKey(meta, "System", "Events", nil, nil)
-	if err != nil {
-		return err
-	}
-
-	raw, err := api.RPC.State.GetStorageRaw(key, hash)
-	if err != nil {
-		return err
-	}
-
-	events := types.EventRecords{}
-	err = types.EventRecordsRaw(*raw).DecodeEventRecords(meta, &events)
+	transfers, err := s.adaptor.Transfers(number)
 	if err != nil {
 		return err
 	}
 
 	senders := make(map[string]map[string]*big.Int)
 	receivers := make(map[string]map[string]*big.Int)
-	for _, v := range events.Balances_Transfer {
-		sender := s.network.Address(v.From[:])
-		receiver := s.network.Address(v.To[:])
+	for _, v := range transfers {
+		sender := v.Sender
+		receiver := v.Receiver
 		if _, ok := senders[sender]; !ok {
 			senders[sender] = make(map[string]*big.Int)
 		}
@@ -121,8 +102,8 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 			receivers[receiver][sender] = big.NewInt(0)
 		}
 
-		senders[sender][receiver].Add(senders[sender][receiver], v.Value.Int)
-		receivers[receiver][sender].Add(receivers[receiver][sender], v.Value.Int)
+		senders[sender][receiver].Add(senders[sender][receiver], v.FullAmount)
+		receivers[receiver][sender].Add(receivers[receiver][sender], v.FullAmount)
 	}
 
 	addrCount, err := s.db.SubscribersCount()
@@ -144,7 +125,7 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 		i += addressesLimit
 
 		for _, sub := range subscribers {
-			if len(receivers) == 0 || len(senders) == 0 {
+			if len(receivers) == 0 && len(senders) == 0 {
 				return nil
 			}
 
@@ -163,7 +144,7 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 						name = p.Name
 					}
 
-					msg := s.notificator.Msg(name, notificator.Sent, currency.ConvertFromPlanck(amount), currency)
+					msg := s.notificator.Msg(name, firebase.Sent, currency.ConvertFromPlanck(amount), currency)
 					err = s.notificator.Notify(msg, sub.Token)
 
 					log.Printf("%s: Notify Type: Sent; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",
@@ -190,7 +171,7 @@ func (s *EventScanner) scanBlock(api *gsrpc.SubstrateAPI, number uint64) error {
 						name = p.Name
 					}
 
-					msg := s.notificator.Msg(name, notificator.Received, currency.ConvertFromPlanck(amount), currency)
+					msg := s.notificator.Msg(name, firebase.Received, currency.ConvertFromPlanck(amount), currency)
 					err = s.notificator.Notify(msg, sub.Token)
 
 					log.Printf("%s: Notify Type: Received; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",

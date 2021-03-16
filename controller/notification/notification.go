@@ -67,7 +67,8 @@ func (c *Controller) subscribe(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	rqTime := time.Unix(updateTokenRq.Timestamp, 0)
-	if rqTime.After(time.Now().Add(controller.SignTimeout)) {
+	now := time.Now()
+	if now.After(rqTime.Add(controller.SignTimeout)) || now.After(rqTime.Add(1*time.Minute)) {
 		return controller.InvalidSignTimeErr
 	}
 

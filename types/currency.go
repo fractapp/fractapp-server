@@ -27,7 +27,7 @@ func (c Currency) Decimals() int64 {
 		return 12
 	}
 
-	return 0
+	return 10
 }
 
 func (c Currency) String() string {

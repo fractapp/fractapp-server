@@ -6,15 +6,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"fractapp-server/adaptors"
 	"fractapp-server/config"
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
 	internalMiddleware "fractapp-server/controller/middleware"
-	"fractapp-server/controller/notification"
+	notificationController "fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
-	"fractapp-server/email"
-	"fractapp-server/notificator"
+	"fractapp-server/docs"
+	"fractapp-server/firebase"
+	"fractapp-server/notification"
 	"fractapp-server/scanner"
 	"fractapp-server/types"
 	"log"
@@ -22,6 +24,8 @@ import (
 	"os"
 	"os/signal"
 	"time"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -37,6 +41,24 @@ func init() {
 	flag.StringVar(&configPath, "config", configPath, "config file")
 	flag.Parse()
 }
+
+// @contact.name Support
+// @contact.email support@fractapp.com
+// @license.name Apache 2.0
+// @license.url https://github.com/fractapp/fractapp-server/blob/main/LICENSE
+// @termsOfService https://fractapp.com/legal/tos.pdf
+
+// @securityDefinitions.apikey AuthWithPubKey-SignTimestamp
+// @in header
+// @name Sign-Timestamp
+
+// @securityDefinitions.apikey AuthWithPubKey-Sign
+// @in header
+// @name Sign
+
+// @securityDefinitions.apikey AuthWithPubKey-Auth-Key
+// @in header
+// @name Auth-Key
 
 func main() {
 	ctx := context.Background()
@@ -89,24 +111,36 @@ func start(ctx context.Context) error {
 
 	pgDb := (*db.PgDB)(database)
 
-	emailClient, err := email.New(config.Host, config.From.Address, config.From.Name, config.Password)
+	emailClient, err := notification.NewSMTPNotificator(config.Host, config.From.Address, config.From.Name, config.Password)
 	if err != nil {
 		return err
 	}
 
 	tokenAuth := jwtauth.New("HS256", []byte(config.Secret), nil)
-	nController := notification.NewController(pgDb)
+	twilioApi := notification.NewTwilioNotificator(config.SMSService.FromNumber,
+		config.SMSService.AccountSid, config.SMSService.AuthToken)
+
+	nController := notificationController.NewController(pgDb)
 	pController := profile.NewController(pgDb)
 	authController := auth.NewController(
 		pgDb,
-		config.SMSService.FromNumber,
-		config.SMSService.AccountSid,
-		config.SMSService.AuthToken,
+		twilioApi,
 		emailClient,
 		tokenAuth,
 	)
 
 	authMiddleware := internalMiddleware.New(pgDb)
+
+	// programmatically set swagger info
+	docs.SwaggerInfo.Title = "Swagger Fractapp Server API"
+	docs.SwaggerInfo.Description = "This is Fractapp server. Auth with pub key mechanism described here: "
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = host
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL(host+"/swagger/doc.json"),
+	))
 
 	r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 	r.Group(func(r chi.Router) {
@@ -151,7 +185,7 @@ func start(ctx context.Context) error {
 		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))
 
 		r.Route(nController.MainRoute(), func(r chi.Router) {
-			r.Post(notification.SubscribeRoute, controller.Route(nController, notification.SubscribeRoute))
+			r.Post(notificationController.SubscribeRoute, controller.Route(nController, notificationController.SubscribeRoute))
 		})
 	})
 
@@ -170,15 +204,16 @@ func start(ctx context.Context) error {
 
 	log.Printf("http: Server listen: %s", host)
 
-	n, err := notificator.NewFirebaseNotificator(ctx, config.Firebase.WithCredentialsFile, config.Firebase.ProjectId)
+	n, err := firebase.NewClient(ctx, config.Firebase.WithCredentialsFile, config.Firebase.ProjectId)
 	if err != nil {
 		return err
 	}
 	for k, url := range config.SubstrateUrls {
 		network := types.ParseNetwork(k)
-		es := scanner.NewEventScanner(url, pgDb, network.String(), network, n)
+		adaptor := adaptors.NewSubstrateAdaptor(url, network)
+		bs := scanner.NewBlockScanner(pgDb, network.String(), network, n, adaptor)
 		go func() {
-			err = es.Start()
+			err = bs.Start()
 			if err != nil {
 				log.Printf("%s scanner down: %s \n", network.String(), err)
 			}
