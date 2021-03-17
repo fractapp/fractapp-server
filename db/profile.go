@@ -42,7 +42,7 @@ func (db *PgDB) SearchUsersByUsername(value string, limit int) ([]Profile, error
 }
 func (db *PgDB) SearchUsersByEmail(value string) (*Profile, error) {
 	p := &Profile{}
-	err := db.Model(p).Where("lower(notification) = ?", value).Select()
+	err := db.Model(p).Where("lower(email) = ?", value).Select()
 	if err != nil {
 		return nil, err
 	}

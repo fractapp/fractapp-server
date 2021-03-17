@@ -48,6 +48,10 @@ func init() {
 // @license.url https://github.com/fractapp/fractapp-server/blob/main/LICENSE
 // @termsOfService https://fractapp.com/legal/tos.pdf
 
+// @securityDefinitions.apikey AuthWithJWT
+// @in header
+// @name Authorization
+
 // @securityDefinitions.apikey AuthWithPubKey-SignTimestamp
 // @in header
 // @name Sign-Timestamp
@@ -133,7 +137,7 @@ func start(ctx context.Context) error {
 
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Swagger Fractapp Server API"
-	docs.SwaggerInfo.Description = "This is Fractapp server. Auth with pub key mechanism described here: "
+	docs.SwaggerInfo.Description = "This is Fractapp server. Authorization flow described here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md"
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = host
 	docs.SwaggerInfo.BasePath = "/"
@@ -179,7 +183,6 @@ func start(ctx context.Context) error {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
 		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))

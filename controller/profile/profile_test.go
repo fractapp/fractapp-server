@@ -28,7 +28,7 @@ import (
 func TestMainRoute(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	controller := NewController(mocks.NewMockDB(ctrl))
-	assert.Equal(t, controller.MainRoute(), "/profile")
+	assert.Equal(t, controller.MainRoute(), "/info")
 }
 
 func testErr(t *testing.T, controller *Controller, err error) {
@@ -79,7 +79,7 @@ func TestSearchByUsername(t *testing.T) {
 	mockDb.EXPECT().SearchUsersByUsername(value, 10).Return(profiles, nil)
 	mockDb.EXPECT().AddressesById(profiles[0].Id).Return(addresses, nil)
 
-	user := UserProfileShort{
+	user := ShortUserProfile{
 		Id:         profiles[0].Id,
 		Name:       profiles[0].Name,
 		Username:   profiles[0].Username,
@@ -107,7 +107,7 @@ func TestSearchByUsername(t *testing.T) {
 	}
 	returnErr := search(w, httpRq)
 
-	var returnUsers []UserProfileShort
+	var returnUsers []ShortUserProfile
 	err = json.Unmarshal(w.Body.Bytes(), &returnUsers)
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +145,7 @@ func TestSearchByEmail(t *testing.T) {
 	mockDb.EXPECT().SearchUsersByEmail(value).Return(profile, nil)
 	mockDb.EXPECT().AddressesById(profile.Id).Return(addresses, nil)
 
-	user := UserProfileShort{
+	user := ShortUserProfile{
 		Id:         profile.Id,
 		Name:       profile.Name,
 		Username:   profile.Username,
@@ -173,7 +173,7 @@ func TestSearchByEmail(t *testing.T) {
 	}
 	returnErr := search(w, httpRq)
 
-	var returnUsers []UserProfileShort
+	var returnUsers []ShortUserProfile
 	err = json.Unmarshal(w.Body.Bytes(), &returnUsers)
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +207,7 @@ func TestSearchMinSearchLength(t *testing.T) {
 	}
 	returnErr := search(w, httpRq)
 
-	var returnUsers []UserProfileShort
+	var returnUsers []ShortUserProfile
 	err = json.Unmarshal(w.Body.Bytes(), &returnUsers)
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +241,7 @@ func TestProfileInfoById(t *testing.T) {
 		AvatarExt:   "png",
 		LastUpdate:  123,
 	}
-	user := &UserProfileShort{
+	user := &ShortUserProfile{
 		Id:         profile.Id,
 		Name:       profile.Name,
 		Username:   profile.Username,
@@ -273,7 +273,7 @@ func TestProfileInfoById(t *testing.T) {
 	}
 	returnErr := profileInfo(w, httpRq)
 
-	returnUser := &UserProfileShort{}
+	returnUser := &ShortUserProfile{}
 	err = json.Unmarshal(w.Body.Bytes(), returnUser)
 	if err != nil {
 		t.Fatal(err)
@@ -306,7 +306,7 @@ func TestProfileInfoByAddress(t *testing.T) {
 		AvatarExt:   "png",
 		LastUpdate:  123,
 	}
-	user := &UserProfileShort{
+	user := &ShortUserProfile{
 		Id:         profile.Id,
 		Name:       profile.Name,
 		Username:   profile.Username,
@@ -338,7 +338,7 @@ func TestProfileInfoByAddress(t *testing.T) {
 	}
 	returnErr := profileInfo(w, httpRq)
 
-	returnUser := &UserProfileShort{}
+	returnUser := &ShortUserProfile{}
 	err = json.Unmarshal(w.Body.Bytes(), returnUser)
 	if err != nil {
 		t.Fatal(err)
@@ -549,7 +549,7 @@ func TestMyMatchContacts(t *testing.T) {
 			LastUpdate:  123123,
 		},
 	}
-	users := []UserProfileShort{
+	users := []ShortUserProfile{
 		{
 			Id:         contacts[0].Id,
 			Name:       contacts[0].Name,
@@ -615,7 +615,7 @@ func TestMyMatchContacts(t *testing.T) {
 
 	assert.Assert(t, err == nil)
 
-	var returnUsers []UserProfileShort
+	var returnUsers []ShortUserProfile
 	err = json.Unmarshal(w.Body.Bytes(), &returnUsers)
 	if err != nil {
 		t.Fatal(err)
