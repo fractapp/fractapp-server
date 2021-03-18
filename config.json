@@ -4,8 +4,7 @@
     "Kusama": ""
   },
   "Firebase": {
-    "ProjectId": "",
-    "WithCredentialsFile": ""
+    "ProjectId": ""
   },
   "SMSService": {
     "FromNumber": "",

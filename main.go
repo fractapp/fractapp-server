@@ -139,7 +139,6 @@ func start(ctx context.Context) error {
 	docs.SwaggerInfo.Title = "Swagger Fractapp Server API"
 	docs.SwaggerInfo.Description = "This is Fractapp server. Authorization flow described here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = host
 	docs.SwaggerInfo.BasePath = "/"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -207,7 +206,7 @@ func start(ctx context.Context) error {
 
 	log.Printf("http: Server listen: %s", host)
 
-	n, err := firebase.NewClient(ctx, config.Firebase.WithCredentialsFile, config.Firebase.ProjectId)
+	n, err := firebase.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
 	if err != nil {
 		return err
 	}

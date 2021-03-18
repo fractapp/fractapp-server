@@ -30,8 +30,7 @@ type SMSService struct {
 	AuthToken  string
 }
 type Firebase struct {
-	ProjectId           string
-	WithCredentialsFile string
+	ProjectId string
 }
 type DB struct {
 	Host     string
