@@ -140,7 +140,6 @@ func start(ctx context.Context) error {
 	docs.SwaggerInfo.Description = "This is Fractapp server. Authorization flow described here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md"
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.BasePath = "/"
-	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL(host+"/swagger/doc.json"),
 	))
