@@ -2,9 +2,7 @@
 
 ## Getting Started with golang
 
-1. Install golang
-
-   https://golang.org/doc/install
+1. [Install golang](https://golang.org/doc/install)
 
 2. Setup firebase/postgres/twilio/smtp
 
