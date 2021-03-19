@@ -11,7 +11,7 @@ type MyProfile struct {
 	Name        string `json:"name"`     // name in fractapp
 	Username    string `json:"username"` // username in fractapp
 	PhoneNumber string `json:"phoneNumber"`
-	Email       string `json:"notification"`
+	Email       string `json:"email"`
 	IsMigratory bool   `json:"isMigratory"` // always false. This property is for the future
 	AvatarExt   string `json:"avatarExt"`   // avatar format (png/jpg/jpeg)
 	LastUpdate  int64  `json:"lastUpdate"`  // timestamp of the last info update

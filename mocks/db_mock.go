@@ -200,19 +200,49 @@ func (mr *MockDBMockRecorder) SearchUsersByEmail(value interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUsersByEmail", reflect.TypeOf((*MockDB)(nil).SearchUsersByEmail), value)
 }
 
-// ProfileByPhoneNumber mocks base method
-func (m *MockDB) ProfileByPhoneNumber(contactPhoneNumber, myPhoneNumber string) (*db.Profile, error) {
+// ProfileByMatchedPhoneNumber mocks base method
+func (m *MockDB) ProfileByMatchedPhoneNumber(contactPhoneNumber, myPhoneNumber string) (*db.Profile, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProfileByPhoneNumber", contactPhoneNumber, myPhoneNumber)
+	ret := m.ctrl.Call(m, "ProfileByMatchedPhoneNumber", contactPhoneNumber, myPhoneNumber)
+	ret0, _ := ret[0].(*db.Profile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProfileByMatchedPhoneNumber indicates an expected call of ProfileByMatchedPhoneNumber
+func (mr *MockDBMockRecorder) ProfileByMatchedPhoneNumber(contactPhoneNumber, myPhoneNumber interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfileByMatchedPhoneNumber", reflect.TypeOf((*MockDB)(nil).ProfileByMatchedPhoneNumber), contactPhoneNumber, myPhoneNumber)
+}
+
+// ProfileByPhoneNumber mocks base method
+func (m *MockDB) ProfileByPhoneNumber(phoneNumber string) (*db.Profile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProfileByPhoneNumber", phoneNumber)
 	ret0, _ := ret[0].(*db.Profile)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ProfileByPhoneNumber indicates an expected call of ProfileByPhoneNumber
-func (mr *MockDBMockRecorder) ProfileByPhoneNumber(contactPhoneNumber, myPhoneNumber interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) ProfileByPhoneNumber(phoneNumber interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfileByPhoneNumber", reflect.TypeOf((*MockDB)(nil).ProfileByPhoneNumber), contactPhoneNumber, myPhoneNumber)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfileByPhoneNumber", reflect.TypeOf((*MockDB)(nil).ProfileByPhoneNumber), phoneNumber)
+}
+
+// ProfileByEmail mocks base method
+func (m *MockDB) ProfileByEmail(email string) (*db.Profile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProfileByEmail", email)
+	ret0, _ := ret[0].(*db.Profile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProfileByEmail indicates an expected call of ProfileByEmail
+func (mr *MockDBMockRecorder) ProfileByEmail(email interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfileByEmail", reflect.TypeOf((*MockDB)(nil).ProfileByEmail), email)
 }
 
 // CreateProfile mocks base method
@@ -345,23 +375,4 @@ func (m *MockDB) UpdateByPK(value interface{}) error {
 func (mr *MockDBMockRecorder) UpdateByPK(value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateByPK", reflect.TypeOf((*MockDB)(nil).UpdateByPK), value)
-}
-
-// Update mocks base method
-func (m *MockDB) Update(value interface{}, condition string, params ...interface{}) error {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{value, condition}
-	for _, a := range params {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Update", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Update indicates an expected call of Update
-func (mr *MockDBMockRecorder) Update(value, condition interface{}, params ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{value, condition}, params...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockDB)(nil).Update), varargs...)
 }

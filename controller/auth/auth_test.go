@@ -566,6 +566,7 @@ func TestSignForNewUser(t *testing.T) {
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
 	mockDb.EXPECT().ProfileById(id).Return(nil, db.ErrNoRows)
+	mockDb.EXPECT().ProfileByPhoneNumber(rq.Value).Return(nil, db.ErrNoRows)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 2, 3, 4, time.UTC)
 	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
@@ -667,6 +668,7 @@ func TestSignForInvalidSignTimestamp(t *testing.T) {
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
 	mockDb.EXPECT().ProfileById(id).Return(nil, db.ErrNoRows)
+	mockDb.EXPECT().ProfileByPhoneNumber(rq.Value).Return(nil, db.ErrNoRows)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 10, 1, 0, time.UTC)
 	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
@@ -696,7 +698,7 @@ func TestSignForInvalidSignTimestamp(t *testing.T) {
 
 	assert.Assert(t, err == controller.InvalidSignTimeErr)
 }
-func TestSignForExistUser(t *testing.T) {
+func TestSignWithExistUserForAddress(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
@@ -734,6 +736,7 @@ func TestSignForExistUser(t *testing.T) {
 		IsMigratory: false,
 	}
 	mockDb.EXPECT().ProfileById(id).Return(profile, nil)
+	mockDb.EXPECT().ProfileByEmail(rq.Value).Return(nil, db.ErrNoRows)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 2, 3, 4, time.UTC)
 	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
@@ -771,7 +774,7 @@ func TestSignForExistUser(t *testing.T) {
 	newProfile := *profile
 	newProfile.Email = rq.Value
 	mockDb.EXPECT().UpdateByPK(&newProfile).Return(nil).Times(1)
-	mockDb.EXPECT().Update(&db.Token{Token: tokenString, Id: id}, "id = ?", id).Return(nil).Times(1)
+	mockDb.EXPECT().UpdateByPK(&db.Token{Token: tokenString, Id: id}).Return(nil).Times(1)
 
 	signIn, err := controller.Handler("/signIn")
 	if err != nil {

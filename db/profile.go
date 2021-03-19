@@ -17,7 +17,7 @@ type Profile struct {
 	LastUpdate  int64 `pg:",use_zero"`
 }
 
-func (db *PgDB) ProfileByPhoneNumber(contactPhoneNumber string, myPhoneNumber string) (*Profile, error) {
+func (db *PgDB) ProfileByMatchedPhoneNumber(contactPhoneNumber string, myPhoneNumber string) (*Profile, error) {
 	p := &Profile{}
 	if err := db.Model(p).Where("phone_number = ?", contactPhoneNumber).Select(); err != nil {
 		return nil, err
@@ -83,7 +83,24 @@ func (db *PgDB) ProfileByAddress(address string) (*Profile, error) {
 
 	return p, nil
 }
+func (db *PgDB) ProfileByPhoneNumber(phoneNumber string) (*Profile, error) {
+	p := &Profile{}
+	err := db.Model(p).Where("phone_number = ?", phoneNumber).Select()
+	if err != nil {
+		return nil, err
+	}
 
+	return p, nil
+}
+func (db *PgDB) ProfileByEmail(email string) (*Profile, error) {
+	p := &Profile{}
+	err := db.Model(p).Where("email = ?", email).Select()
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
 func (db *PgDB) UsernameIsExist(username string) (bool, error) {
 	return db.Model(&Profile{}).Where("username = ?", username).Exists()
 }

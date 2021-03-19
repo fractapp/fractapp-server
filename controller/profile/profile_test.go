@@ -28,7 +28,7 @@ import (
 func TestMainRoute(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	controller := NewController(mocks.NewMockDB(ctrl))
-	assert.Equal(t, controller.MainRoute(), "/info")
+	assert.Equal(t, controller.MainRoute(), "/profile")
 }
 
 func testErr(t *testing.T, controller *Controller, err error) {

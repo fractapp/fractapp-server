@@ -227,7 +227,18 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if profile != nil && profile.Id != id {
+	existProfile := &db.Profile{}
+	switch rq.Type {
+	case notification.Email:
+		existProfile, err = c.db.ProfileByEmail(rq.Value)
+	case notification.SMS:
+		existProfile, err = c.db.ProfileByPhoneNumber(rq.Value)
+	}
+
+	if err != nil && err != db.ErrNoRows {
+		return err
+	}
+	if err != db.ErrNoRows && existProfile != nil && existProfile.Id != id {
 		return AccountExistErr
 	}
 
@@ -303,7 +314,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	if err == db.ErrNoRows {
 		err = c.db.Insert(&db.Token{Token: tokenString, Id: id})
 	} else {
-		err = c.db.Update(&db.Token{Token: tokenString, Id: id}, "id = ?", id)
+		err = c.db.UpdateByPK(&db.Token{Token: tokenString, Id: id})
 	}
 	if err != nil {
 		return err

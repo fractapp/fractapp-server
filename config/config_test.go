@@ -23,8 +23,7 @@ func TestParse(t *testing.T) {
 			AuthToken:  "auth",
 		},
 		Firebase: Firebase{
-			ProjectId:           "projectId",
-			WithCredentialsFile: "credential",
+			ProjectId: "projectId",
 		},
 		DB: DB{
 			Host:     "host",
