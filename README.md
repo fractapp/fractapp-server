@@ -1,14 +1,12 @@
 ## Only android version
 
-## Getting Started with golang
+## Setup services
 
-1. [Install golang](https://golang.org/doc/install)
+1. Setup firebase/postgres/twilio/smtp
 
-2. Setup firebase/postgres/twilio/smtp
+2. Copy firebase private key json to root project directory. This file must have name firebase.json [more info](https://firebase.google.com/docs/admin/setup)
 
-3. Copy firebase private key json to root project directory. This file must have name firebase.json [more info](https://firebase.google.com/docs/admin/setup)
-   
-4. Setup config.release.json (example in config.json)
+3. Setup config.release.json (example in config.json)
 ```
 {
   "SubstrateUrls": {
@@ -41,17 +39,27 @@
 }
 ```
 
-5. Install packages
+4. Run migrations
+```sh
+go run migrations/*.go --config config.release.json init
+go run migrations/*.go --config config.release.json up
+```
+
+## Run with golang
+
+1. [Install golang](https://golang.org/doc/install)
+
+2. Install packages
 ```sh
 go mod download
 ```
 
-6. Build
+3. Build
 ```sh
 go build 
 ```
 
-7. Run
+4. Run
 ```
 ./fractapp-server --config config.release.json --host 127.0.0.1:9544
 
@@ -60,51 +68,14 @@ config - config file path
 host - host for listen fractapp server
 ```
 
-## Docker
+## Run with Docker
 
-1. Setup firebase/postgres/twilio/smtp
-   
-2. Copy firebase private key json to root project directory. This file must have name firebase.json [more info](https://firebase.google.com/docs/admin/setup)
-
-4. Setup config.release.json (example in config.json)
-```
-{
-  "SubstrateUrls": {
-    "Polkadot": "",              // wss host for Polkadot node (we can use "wss://rpc.polkadot.io")
-    "Kusama": ""                 // wss host for Kusama node (we can use "wss://kusama-rpc.polkadot.io")
-  },
-  "Firebase": {
-    "ProjectId": ""            // project id from firebase account
-  },
-  "SMSService": {
-    "FromNumber": "",           // sender twilio number 
-    "AccountSid": "",           // account sid from twilio account
-    "AuthToken": ""             // aith token from twilio account
-  },
-  "DB": {                       // postgres config
-    "Host": "",
-    "User": "",
-    "Password": "",
-    "Database": ""
-  },
-  "Secret": "",                 // secret for jwt token generator
-  "SMTP": {                     // smtp server config 
-    "Host": "",      
-    "Password": "",             // smtp server password
-    "From": { 
-      "Name": "",               // Sender name 
-      "Address": ""             // Sender email 
-    }
-  }
-}
-```
-
-5. Build
+1. Build
 ```
 docker build -t fractapp-server .
 ```
 
-6. Run
+2. Run
 ```
 docker run -d -p 127.0.0.1:9544:9544 fractapp-server
 ```

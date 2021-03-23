@@ -144,7 +144,6 @@ func start(ctx context.Context) error {
 		httpSwagger.URL(host+"/swagger/doc.json"),
 	))
 
-	r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware.PubKeyAuth)
 		r.Route(authController.MainRoute(), func(r chi.Router) {
@@ -152,18 +151,6 @@ func start(ctx context.Context) error {
 		})
 	})
 
-	fs := http.FileServer("." + http.Dir(profile.AvatarDir))
-	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		if _, err := os.Stat(path + profile.AvatarDir + "/" + r.RequestURI); os.IsNotExist(err) {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		} else {
-			fs.ServeHTTP(w, r)
-		}
-	})
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(404)
-	})
 	r.Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(tokenAuth))
 		r.Use(authMiddleware.JWTAuth)
@@ -181,9 +168,12 @@ func start(ctx context.Context) error {
 	})
 
 	r.Group(func(r chi.Router) {
+		r.Get(pController.MainRoute()+profile.AvatarRoute+"/*", controller.Route(pController, profile.AvatarRoute))
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
 		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))
+
+		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 
 		r.Route(nController.MainRoute(), func(r chi.Router) {
 			r.Post(notificationController.SubscribeRoute, controller.Route(nController, notificationController.SubscribeRoute))
