@@ -184,6 +184,41 @@ var doc = `{
                 }
             }
         },
+        "/profile/avatar/{userId}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get user avatar",
+                "operationId": "avatar",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/profile/contacts": {
             "get": {
                 "security": [
@@ -676,6 +711,9 @@ var doc = `{
                     "description": "avatar format (png/jpg/jpeg)",
                     "type": "string"
                 },
+                "email": {
+                    "type": "string"
+                },
                 "id": {
                     "description": "id from info",
                     "type": "string"
@@ -690,9 +728,6 @@ var doc = `{
                 },
                 "name": {
                     "description": "name in fractapp",
-                    "type": "string"
-                },
-                "notification": {
                     "type": "string"
                 },
                 "phoneNumber": {
