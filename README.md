@@ -4,9 +4,11 @@
 
 1. Setup firebase/postgres/twilio/smtp
 
-2. Copy firebase private key json to root project directory. This file must have name firebase.json [more info](https://firebase.google.com/docs/admin/setup)
+2. [Install golang](https://golang.org/doc/install)
 
-3. Setup config.release.json (example in config.json)
+3. Copy firebase private key json to root project directory. This file must have name firebase.json. ([more info](https://firebase.google.com/docs/admin/setup))
+
+4. Setup config.release.json (example in config.json)
 ```
 {
   "SubstrateUrls": {
@@ -39,7 +41,7 @@
 }
 ```
 
-4. Run migrations
+5. Run migrations
 ```sh
 go run migrations/*.go --config config.release.json init
 go run migrations/*.go --config config.release.json up
@@ -47,19 +49,12 @@ go run migrations/*.go --config config.release.json up
 
 ## Run with golang
 
-1. [Install golang](https://golang.org/doc/install)
-
-2. Install packages
-```sh
-go mod download
-```
-
-3. Build
+1. Build
 ```sh
 go build 
 ```
 
-4. Run
+2. Run
 ```
 ./fractapp-server --config config.release.json --host 127.0.0.1:9544
 
