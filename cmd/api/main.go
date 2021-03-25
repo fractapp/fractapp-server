@@ -70,7 +70,7 @@ func main() {
 }
 
 func start(ctx context.Context, cancel context.CancelFunc) error {
-	log.Println("Setup notification service")
+	log.Println("Setup api service")
 	// parse config
 	config, err := config.Parse(configPath)
 	if err != nil {

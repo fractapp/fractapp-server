@@ -645,4 +645,20 @@ func (c *Controller) usernameIsExist(username string) (bool, error) {
 
 	return isExist, nil
 }
-git
+
+// username godoc
+// @Summary get transaction by address
+// @ID getTransactions
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param address query string true "address"
+// @Param page query int true "page"
+// @Param size query int true "size"
+// @Success 200
+// @Failure 404 {string} string
+// @Failure 400 {string} string
+// @Router /profile/username [get]
+func (c *Controller) getTxs(address string, page uint64, size uint64) {
+
+}

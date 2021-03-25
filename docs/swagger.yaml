@@ -475,13 +475,23 @@ paths:
     get:
       consumes:
       - application/json
-      operationId: username
+      operationId: getTransactions
       parameters:
-      - description: username min length 4
+      - description: address
         in: query
-        name: username
+        name: address
         required: true
         type: string
+      - description: page
+        in: query
+        name: page
+        required: true
+        type: integer
+      - description: size
+        in: query
+        name: size
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -495,7 +505,7 @@ paths:
           description: Not Found
           schema:
             type: string
-      summary: Is username exist?
+      summary: get transaction by address
       tags:
       - Profile
 securityDefinitions:

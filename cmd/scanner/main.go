@@ -6,15 +6,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"fractapp-server/adaptors"
+	"fractapp-server/adaptors/polkascan"
 	"fractapp-server/config"
 	"fractapp-server/db"
 	"fractapp-server/firebase"
 	"fractapp-server/scanner"
 	"fractapp-server/types"
-	"log"
+
 	"os"
 	"os/signal"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/go-pg/pg/v10"
 )
@@ -36,7 +38,7 @@ func main() {
 }
 
 func start(ctx context.Context, cancel context.CancelFunc) error {
-	log.Println("Setup scanner")
+	log.Info("Start scanner ...")
 	// parse config
 	config, err := config.Parse(configPath)
 	if err != nil {
@@ -64,17 +66,16 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 	if err != nil {
 		return err
 	}
-	for k, url := range config.SubstrateUrls {
+	for k, url := range config.AdaptorUrls {
 		network := types.ParseNetwork(k)
-		adaptor := adaptors.NewSubstrateAdaptor(url, network)
+		adaptor := polkascan.NewAdaptor(url, network)
 		bs := scanner.NewBlockScanner(pgDb, network.String(), network, n, adaptor)
 		go func() {
 			err = bs.Start()
 			if err != nil {
-				log.Printf("%s scanner down: %s \n", network.String(), err)
+				log.Errorf("%s scanner down: %s", network.String(), err)
 			}
 		}()
-		log.Printf("Event scanner for %s started \n", k)
 	}
 
 	// await exit signal

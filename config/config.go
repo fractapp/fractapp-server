@@ -6,13 +6,13 @@ import (
 )
 
 type Config struct {
-	BinanceApi    string
-	SubstrateUrls map[string]string
-	SMSService    SMSService
-	Firebase      Firebase
-	DB            DB
-	Secret        string
-	SMTP          `json:"SMTP"`
+	BinanceApi  string
+	AdaptorUrls map[string]string
+	SMSService  SMSService
+	Firebase    Firebase
+	DB          DB
+	Secret      string
+	SMTP        `json:"SMTP"`
 }
 
 type SMTP struct {

@@ -1,6 +1,6 @@
 {
   "BinanceApi": "",
-  "SubstrateUrls": {
+  "AdaptorUrls": {
     "Polkadot": "",
     "Kusama": ""
   },

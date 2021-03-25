@@ -21,7 +21,7 @@ require (
 	github.com/lestrrat-go/jwx v1.0.6-0.20201127121120-26218808f029
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/rs/zerolog v1.20.0 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/sirupsen/logrus v1.8.1
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/gin-swagger v1.3.0
 	github.com/swaggo/http-swagger v1.0.0

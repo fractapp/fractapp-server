@@ -4,8 +4,9 @@ import (
 	"fractapp-server/adaptors"
 	"fractapp-server/db"
 	"fractapp-server/firebase"
-	"log"
 	"math/big"
+
+	log "github.com/sirupsen/logrus"
 
 	dbType "fractapp-server/types"
 )
@@ -31,18 +32,7 @@ func NewBlockScanner(db db.DB, prefix string, network dbType.Network, notificato
 }
 
 func (s *BlockScanner) Start() error {
-	err := s.adaptor.Connect()
-	if err != nil {
-		return err
-	}
-
-	log.Printf("%s: subscribe new block \n", s.prefix)
-	err = s.adaptor.Subscribe()
-	if err != nil {
-		return err
-	}
-
-	defer s.adaptor.Unsubscribe()
+	log.Infof("%s: start scanner ...", s.prefix)
 
 	var lastHeight uint64
 	for {
@@ -51,33 +41,28 @@ func (s *BlockScanner) Start() error {
 }
 
 func (s *BlockScanner) scanNewHeight(lastHeight uint64) uint64 {
-	blockNumber, err := s.adaptor.WaitNewBlock()
+	s.adaptor.Transfers(4345674)
+
+	return 0
+	lastScannerHeight, err := s.adaptor.LastHeight()
 	if err != nil {
-		log.Printf("%s: Error substrate rpc: %s \n", s.prefix, err.Error())
-		log.Printf("%s: Repeated subscribe new block \n", s.prefix)
-
-		s.adaptor.Unsubscribe()
-		err = s.adaptor.Subscribe()
-
-		if err != nil {
-			log.Printf("%s: Error repeated subscribe: %s \n", s.prefix, err.Error())
-		}
+		log.Errorf("%s: Error: %s", s.prefix, err.Error())
 		return lastHeight
 	} else {
-		if lastHeight > blockNumber {
+		if lastHeight >= lastScannerHeight {
 			return lastHeight
 		}
-		err := s.scanBlock(blockNumber)
+
+		log.Infof("%s: Scan new block: %d", s.prefix, lastScannerHeight)
+		err := s.scanBlock(lastScannerHeight)
 		if err != nil {
-			log.Printf("%s: Error scan block: %s \n", s.prefix, err.Error())
+			log.Errorf("%s: Error scan block: %s", s.prefix, err.Error())
 		}
-		return blockNumber
+		return lastScannerHeight
 	}
 }
 
 func (s *BlockScanner) scanBlock(number uint64) error {
-	log.Printf("%s: Scan new block: %d \n", s.prefix, number)
-
 	transfers, err := s.adaptor.Transfers(number)
 	if err != nil {
 		return err
@@ -137,7 +122,7 @@ func (s *BlockScanner) scanBlock(number uint64) error {
 					name := receiver
 					p, err := s.db.ProfileByAddress(receiver)
 					if err != nil && err != db.ErrNoRows {
-						log.Printf("invalid get by address in notification service: %s\n", err.Error())
+						log.Errorf("invalid get by address in notification service: %s", err.Error())
 						continue
 					}
 					if err != db.ErrNoRows {
@@ -147,10 +132,10 @@ func (s *BlockScanner) scanBlock(number uint64) error {
 					msg := s.notificator.Msg(name, firebase.Sent, currency.ConvertFromPlanck(amount), currency)
 					err = s.notificator.Notify(msg, sub.Token)
 
-					log.Printf("%s: Notify Type: Sent; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",
+					log.Infof("%s: Notify Type: Sent; Sender:%s; Receiver:%s; Sub:%s Amount:%s;",
 						s.prefix, sub.Address, receiver, sub.Address, amount.String())
 					if err != nil {
-						log.Printf("%s: Error: %s \n", s.prefix, err.Error())
+						log.Error("%s: Error: %s", s.prefix, err.Error())
 					}
 				}
 			}
@@ -164,7 +149,7 @@ func (s *BlockScanner) scanBlock(number uint64) error {
 					name := sender
 					p, err := s.db.ProfileByAddress(sender)
 					if err != nil && err != db.ErrNoRows {
-						log.Printf("invalid get by address in notification service: %s\n", err.Error())
+						log.Infof("invalid get by address in notification service: %s", err.Error())
 						continue
 					}
 					if err != db.ErrNoRows {
@@ -174,10 +159,10 @@ func (s *BlockScanner) scanBlock(number uint64) error {
 					msg := s.notificator.Msg(name, firebase.Received, currency.ConvertFromPlanck(amount), currency)
 					err = s.notificator.Notify(msg, sub.Token)
 
-					log.Printf("%s: Notify Type: Received; Sender:%s; Receiver:%s; Sub:%s Amount:%s; \n",
+					log.Infof("%s: Notify Type: Received; Sender:%s; Receiver:%s; Sub:%s Amount:%s;",
 						s.prefix, sender, sub.Address, sub.Address, amount.String())
 					if err != nil {
-						log.Printf("%s: Error: %s \n", s.prefix, err.Error())
+						log.Errorf("%s: Error: %s", s.prefix, err.Error())
 					}
 				}
 			}

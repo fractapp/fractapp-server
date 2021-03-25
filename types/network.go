@@ -56,6 +56,18 @@ func ParseNetwork(name string) (n Network) {
 	return n
 }
 
+func (n Network) StringToAddress(value string) []byte {
+	var address []byte
+	switch n {
+	case Kusama:
+		fallthrough
+	case Polkadot:
+		address = base58.Decode(value)
+	}
+
+	return address
+}
+
 func (n Network) Address(pubKey []byte) string {
 	var address []byte
 	switch n {

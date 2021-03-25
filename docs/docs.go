@@ -565,13 +565,27 @@ var doc = `{
                 "tags": [
                     "Profile"
                 ],
-                "summary": "Is username exist?",
-                "operationId": "username",
+                "summary": "get transaction by address",
+                "operationId": "getTransactions",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "username min length 4",
-                        "name": "username",
+                        "description": "address",
+                        "name": "address",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page",
+                        "name": "page",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "size",
+                        "name": "size",
                         "in": "query",
                         "required": true
                     }

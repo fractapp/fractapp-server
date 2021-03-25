@@ -4,6 +4,7 @@ import (
 	ftypes "fractapp-server/types"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v2/rpc/chain"
 
@@ -45,7 +46,7 @@ func (a *SubstrateAdaptor) Unsubscribe() {
 	a.blockEvent.Unsubscribe()
 }
 
-func (a *SubstrateAdaptor) WaitNewBlock() (uint64, error) {
+func (a *SubstrateAdaptor) LastHeight() (uint64, error) {
 	select {
 	case e := <-a.blockEvent.Chan():
 		return uint64(e.Number), nil
@@ -63,7 +64,7 @@ func (a *SubstrateAdaptor) Transfers(blockNumber uint64) ([]ftypes.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	a.api.RPC.Chain.GetBlockHashLatest()
 	meta, err := a.api.RPC.State.GetMetadata(hash)
 	if err != nil {
 		return nil, err
@@ -85,8 +86,28 @@ func (a *SubstrateAdaptor) Transfers(blockNumber uint64) ([]ftypes.Tx, error) {
 		return nil, err
 	}
 
+	//fees := make(map[types.Hash]*big.Int)
+	for _, v := range events.Treasury_Deposit {
+		log.Info(len(v.Topics))
+		for _, c := range v.Topics {
+			log.Info(c.Hex())
+		}
+		//fees[v.Topics] = v.Deposited.Int
+	}
+	for _, v := range events.Balances_Deposit {
+		log.Info(len(v.Topics))
+		for _, c := range v.Topics {
+			log.Info(c.Hex())
+		}
+		//fees[v.Topics] = v.Deposited.Int
+	}
 	var txs []ftypes.Tx
 	for _, v := range events.Balances_Transfer {
+		log.Info(len(v.Topics))
+		for _, c := range v.Topics {
+			log.Info(c.Hex())
+		}
+
 		txs = append(txs, ftypes.Tx{
 			Sender:     a.network.Address(v.From[:]),
 			Receiver:   a.network.Address(v.To[:]),

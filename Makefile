@@ -12,3 +12,7 @@ totalCoverage:
 
 htmlCoverage:
 	go test ./... -coverprofile=c.out && go tool cover -html=c.out
+
+updateSwagger:
+	${GOPATH}/bin/swag init -g cmd/api/main.go
+
