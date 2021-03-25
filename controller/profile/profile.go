@@ -645,3 +645,4 @@ func (c *Controller) usernameIsExist(username string) (bool, error) {
 
 	return isExist, nil
 }
+git

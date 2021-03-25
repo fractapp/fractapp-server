@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"fractapp-server/adaptors"
 	"fractapp-server/config"
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
@@ -15,10 +14,7 @@ import (
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
 	"fractapp-server/docs"
-	"fractapp-server/firebase"
 	"fractapp-server/notification"
-	"fractapp-server/scanner"
-	"fractapp-server/types"
 	"log"
 	"net/http"
 	"os"
@@ -65,15 +61,15 @@ func init() {
 // @name Auth-Key
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	err := start(ctx)
+	err := start(ctx, cancel)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func start(ctx context.Context) error {
+func start(ctx context.Context, cancel context.CancelFunc) error {
 	log.Println("Setup notification service")
 	// parse config
 	config, err := config.Parse(configPath)
@@ -195,32 +191,15 @@ func start(ctx context.Context) error {
 
 	log.Printf("http: Server listen: %s", host)
 
-	n, err := firebase.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
-	if err != nil {
-		return err
-	}
-	for k, url := range config.SubstrateUrls {
-		network := types.ParseNetwork(k)
-		adaptor := adaptors.NewSubstrateAdaptor(url, network)
-		bs := scanner.NewBlockScanner(pgDb, network.String(), network, n, adaptor)
-		go func() {
-			err = bs.Start()
-			if err != nil {
-				log.Printf("%s scanner down: %s \n", network.String(), err)
-			}
-		}()
-		log.Printf("Event scanner for %s started \n", k)
-	}
-
 	// await exit signal
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
 
-	exitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
+	exitCtx, shutDownCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer shutDownCancel()
 	srv.Shutdown(exitCtx)
 
+	cancel()
 	return nil
 }

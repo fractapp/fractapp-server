@@ -6,6 +6,7 @@ import (
 )
 
 type Config struct {
+	BinanceApi    string
 	SubstrateUrls map[string]string
 	SMSService    SMSService
 	Firebase      Firebase

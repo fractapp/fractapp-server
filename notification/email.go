@@ -54,7 +54,7 @@ func (client *SMTP) Validate(receiver string) error {
 func (client *SMTP) SendCode(receiver string, code string) error {
 	subj := "Activation code: " + code
 
-	t, err := template.ParseFiles("templates/auth.html")
+	t, err := template.ParseFiles("assets/auth.html")
 	if err != nil {
 		return err
 	}
