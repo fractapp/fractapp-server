@@ -13,7 +13,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 )
@@ -28,6 +30,7 @@ const (
 	UploadContactsRoute  = "/uploadContacts"
 	MyMatchContactsRoute = "/matchContacts"
 	InfoRoute            = "/info"
+	AvatarRoute          = "/avatar"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -43,6 +46,7 @@ var (
 	UsernameIsExistErr   = errors.New("username is exist")
 	UsernameNotFoundErr  = errors.New("username not found")
 	InvalidPropertyErr   = errors.New("property has invalid symbols or length")
+	AvatarNotFoundErr    = errors.New("avatar not found")
 )
 
 type Controller struct {
@@ -78,6 +82,8 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.uploadMyContacts, nil
 	case InfoRoute:
 		return c.info, nil
+	case AvatarRoute:
+		return c.avatar, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -96,6 +102,18 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case UsernameNotFoundErr:
 		http.Error(w, err.Error(), http.StatusNotFound)
+	case AvatarNotFoundErr:
+		path, err := os.Getwd()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		b, err := ioutil.ReadFile(path + "/assets/default-avatar.png")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Write(b)
 	default:
 		http.Error(w, "", http.StatusBadRequest)
 	}
@@ -327,6 +345,42 @@ func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error
 	profile.LastUpdate = sec
 
 	err = c.db.UpdateByPK(profile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// avatar godoc
+// @Summary Get user avatar
+// @ID avatar
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param userId path string true "User ID"
+// @Success 200
+// @Failure 400 {string} string
+// @Router /profile/avatar/{userId} [get]
+func (c *Controller) avatar(w http.ResponseWriter, r *http.Request) error {
+	u, _ := url.Parse(r.URL.Path)
+	userId := path.Base(u.Path)
+
+	var p, err = c.db.ProfileById(userId)
+	if err != nil {
+		return AvatarNotFoundErr
+	}
+
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	b, err := ioutil.ReadFile(path + AvatarDir + "/" + userId + "." + p.AvatarExt)
+	if err != nil {
+		return AvatarNotFoundErr
+	}
+
+	_, err = w.Write(b)
 	if err != nil {
 		return err
 	}

@@ -80,6 +80,8 @@ definitions:
       avatarExt:
         description: avatar format (png/jpg/jpeg)
         type: string
+      email:
+        type: string
       id:
         description: id from info
         type: string
@@ -91,8 +93,6 @@ definitions:
         type: integer
       name:
         description: name in fractapp
-        type: string
-      notification:
         type: string
       phoneNumber:
         type: string
@@ -234,6 +234,29 @@ paths:
       summary: Subscribe
       tags:
       - Notification
+  /profile/avatar/{userId}:
+    get:
+      consumes:
+      - application/json
+      operationId: avatar
+      parameters:
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get user avatar
+      tags:
+      - Profile
   /profile/contacts:
     get:
       consumes:
