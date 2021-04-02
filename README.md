@@ -81,7 +81,7 @@ Swagger is available at {host}/swagger/index.html
 
 ## Make commands
 
-Update all mocks in project for tests. (You need to have [mockgen](https://github.com/golang/mock) installed)
+Update all mocks in project for tests. (You need to have installed [mockgen](https://github.com/golang/mock))
 ```sh
 make updateMocks
 ```
