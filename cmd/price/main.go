@@ -79,8 +79,8 @@ func main() {
 				log.Errorf("invalid start scan: %s", err)
 				continue
 			}
-			log.Info("Wait new price (5m sleep)")
-			time.Sleep(5 * time.Minute) //TODO (calculate wait for time)
+			log.Info("Wait new price")
+			time.Sleep(time.Minute) //TODO (calculate wait for time)
 		}
 	}()
 
@@ -145,13 +145,13 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 		return err
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode == 429 {
 		return RqHttpLimitErr
 	} else if resp.StatusCode == 418 {
 		return IpBannedErr
 	}
-
-	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -175,7 +175,7 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 		return nil
 	}
 
-	log.Infof("Start insert to db (%s) ...", time.Now().String())
+	log.Infof("Start insert to db ...")
 	if pricesLen >= 100 {
 		divider := pricesLen / 10
 		chArray := make([]chan bool, 0)
@@ -192,7 +192,7 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 		write(prices, 0, pricesLen, database, ctx)
 	}
 
-	log.Infof("End insert to db (%s)", time.Now().String())
+	log.Infof("End insert to db")
 	log.Info("-------------------------------------------")
 
 	return nil
@@ -200,10 +200,18 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 
 func write(prices [][]interface{}, startIndex int, endIndex int, database db.DB, ctx context.Context) chan bool {
 	var dbPrices []interface{}
+
+	now := time.Now().Unix() * 1000
 	for _, v := range prices[startIndex:endIndex] {
+		timestamp := int64(v[6].(float64))
+		diff := timestamp - now
+		if diff > 0 {
+			continue
+		}
+
 		price, _ := strconv.ParseFloat(v[4].(string), 32)
 		dbPrices = append(dbPrices, &db.Price{
-			Timestamp: int64(v[6].(float64)),
+			Timestamp: timestamp,
 			Currency:  currency,
 			Price:     float32(price),
 		})

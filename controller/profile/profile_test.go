@@ -226,7 +226,7 @@ func TestProfileInfoById(t *testing.T) {
 	originalId := "      123123      "
 	id := strings.Trim(originalId, " ")
 
-	profileInfo, err := controller.Handler("/info")
+	profileInfo, err := controller.Handler("/userInfo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +264,7 @@ func TestProfileInfoById(t *testing.T) {
 	mockDb.EXPECT().AddressesById(profile.Id).Return(addresses, nil)
 
 	w := httptest.NewRecorder()
-	url, err := url.Parse("http://localhost:80/info?id=" + id)
+	url, err := url.Parse("http://localhost:80/userInfo?id=" + id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestProfileInfoByAddress(t *testing.T) {
 	originalAddress := "      address      "
 	address := strings.Trim(originalAddress, " ")
 
-	profileInfo, err := controller.Handler("/info")
+	profileInfo, err := controller.Handler("/userInfo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +329,7 @@ func TestProfileInfoByAddress(t *testing.T) {
 	mockDb.EXPECT().AddressesById(profile.Id).Return(addresses, nil)
 
 	w := httptest.NewRecorder()
-	url, err := url.Parse("http://localhost:80/info?address=" + address)
+	url, err := url.Parse("http://localhost:80/userInfo?address=" + address)
 	if err != nil {
 		t.Fatal(err)
 	}

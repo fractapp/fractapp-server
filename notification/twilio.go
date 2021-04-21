@@ -36,6 +36,8 @@ func (api *Twilio) Format(receiver string) string {
 func (api *Twilio) Validate(receiver string) error {
 	if strings.Count(receiver, "+") > 1 {
 		return InvalidPhoneNumberErr
+	} else if len(receiver) < 5 {
+		return InvalidPhoneNumberErr
 	}
 	urlStr := fmt.Sprintf("https://lookups.twilio.com/v1/PhoneNumbers/%s?Type=carrier", receiver)
 

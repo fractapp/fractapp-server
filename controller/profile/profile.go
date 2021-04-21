@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/controller/middleware"
 	"fractapp-server/db"
@@ -12,25 +13,30 @@ import (
 	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	UpdateProfileRoute   = "/updateProfile"
-	UsernameRoute        = "/username"
-	UploadAvatarRoute    = "/uploadAvatar"
-	MyProfileRoute       = "/my"
-	SearchRoute          = "/search"
-	MyContactsRoute      = "/contacts"
-	UploadContactsRoute  = "/uploadContacts"
-	MyMatchContactsRoute = "/matchContacts"
-	InfoRoute            = "/info"
-	AvatarRoute          = "/avatar"
+	UpdateProfileRoute     = "/updateProfile"
+	UsernameRoute          = "/username"
+	UploadAvatarRoute      = "/uploadAvatar"
+	MyProfileRoute         = "/my"
+	SearchRoute            = "/search"
+	MyContactsRoute        = "/contacts"
+	UploadContactsRoute    = "/uploadContacts"
+	MyMatchContactsRoute   = "/matchContacts"
+	UserInfoRoute          = "/userInfo"
+	AvatarRoute            = "/avatar"
+	TransactionsRoute      = "/transactions"
+	TransactionStatusRoute = "/transaction/status"
+	SubstrateBalanceRoute  = "/substrate/balance"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -41,21 +47,24 @@ const (
 )
 
 var (
-	InvalidFileFormatErr = errors.New("invalid file format")
-	InvalidFileSizeErr   = errors.New("invalid file size")
-	UsernameIsExistErr   = errors.New("username is exist")
-	UsernameNotFoundErr  = errors.New("username not found")
-	InvalidPropertyErr   = errors.New("property has invalid symbols or length")
-	AvatarNotFoundErr    = errors.New("avatar not found")
+	InvalidFileFormatErr      = errors.New("invalid file format")
+	InvalidFileSizeErr        = errors.New("invalid file size")
+	UsernameIsExistErr        = errors.New("username is exist")
+	UsernameNotFoundErr       = errors.New("username not found")
+	InvalidPropertyErr        = errors.New("property has invalid symbols or length")
+	AvatarNotFoundErr         = errors.New("avatar not found")
+	InvalidConnectionTxApiErr = errors.New("invalid connection to transaction API")
 )
 
 type Controller struct {
-	db db.DB
+	db        db.DB
+	txApiHost string
 }
 
-func NewController(db db.DB) *Controller {
+func NewController(db db.DB, txApiHost string) *Controller {
 	return &Controller{
-		db: db,
+		db:        db,
+		txApiHost: txApiHost,
 	}
 }
 
@@ -80,10 +89,16 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.myMatchContacts, nil
 	case UploadContactsRoute:
 		return c.uploadMyContacts, nil
-	case InfoRoute:
-		return c.info, nil
+	case UserInfoRoute:
+		return c.userInfo, nil
 	case AvatarRoute:
 		return c.avatar, nil
+	case TransactionsRoute:
+		return c.transactions, nil
+	case TransactionStatusRoute:
+		return c.transactionStatus, nil
+	case SubstrateBalanceRoute:
+		return c.substrateBalance, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -134,7 +149,6 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 // @Router /profile/search [get]
 func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 	value := strings.Trim(strings.ToLower(r.URL.Query().Get("value")), " ")
-	searchType := r.URL.Query().Get("type")
 
 	users := make([]ShortUserProfile, 0)
 	if len(value) < MinSearchLength {
@@ -149,12 +163,13 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 
 	var profiles []db.Profile
 	var err error
-	if searchType == "email" {
-		profile, err := c.db.SearchUsersByEmail(value)
-		if err != nil {
-			return err
-		}
 
+	profile, err := c.db.SearchUsersByEmail(value)
+	if err != nil && err != db.ErrNoRows {
+		return err
+	}
+
+	if profile != nil {
 		profiles = append(profiles, *profile)
 	} else {
 		profiles, err = c.db.SearchUsersByUsername(value, MaxUsersResult)
@@ -194,28 +209,24 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// info godoc
+// userInfo godoc
 // @Summary Get user
-// @Description get user by id or blockchain address
-// @ID info
+// @Description get user by id
+// @ID profileInfo
 // @Tags Profile
 // @Accept  json
 // @Produce json
-// @Param id query string false "get user profile by user id"
-// @Param address query string false "get user profile by blockchain address"
+// @Param id query string true "get user profile by user id"
 // @Success 200 {object} ShortUserProfile
 // @Failure 400 {string} string
-// @Router /profile/info [get]
-func (c *Controller) info(w http.ResponseWriter, r *http.Request) error {
+// @Router /profile/userInfo [get]
+func (c *Controller) userInfo(w http.ResponseWriter, r *http.Request) error {
 	id := strings.Trim(r.URL.Query().Get("id"), " ")
-	address := strings.Trim(r.URL.Query().Get("address"), " ")
 
 	var p *db.Profile
 	var err error
 	if id != "" {
 		p, err = c.db.ProfileById(id)
-	} else if address != "" {
-		p, err = c.db.ProfileByAddress(address)
 	} else {
 		return errors.New("invalid params")
 	}
@@ -647,18 +658,238 @@ func (c *Controller) usernameIsExist(username string) (bool, error) {
 }
 
 // username godoc
-// @Summary get transaction by address
+// @Summary Get transactions by address
 // @ID getTransactions
 // @Tags Profile
 // @Accept  json
 // @Produce json
 // @Param address query string true "address"
-// @Param page query int true "page"
-// @Param size query int true "size"
-// @Success 200
-// @Failure 404 {string} string
+// @Param currency query int true "currency"
+// @Success 200 {object} Transaction
 // @Failure 400 {string} string
-// @Router /profile/username [get]
-func (c *Controller) getTxs(address string, page uint64, size uint64) {
+// @Router /profile/transactions [get]
+func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error {
+	address := r.URL.Query().Get("address")
+	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
+	if err != nil {
+		return err
+	}
+	currency := types.Currency(currencyInt)
 
+	resp, err := http.Get(fmt.Sprintf("%s/transactions/%s?currency=%s", c.txApiHost, address, currency.String()))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	txs := make([]types.Transaction, 0)
+	err = json.Unmarshal(body, &txs)
+	if err != nil {
+		return err
+	}
+
+	responseTxs := make([]Transaction, 0)
+	for _, v := range txs {
+		txTime := time.Unix(v.Timestamp/1000, 0)
+		prices, err := c.db.Prices(currency.String(), txTime.
+			Add(-15*time.Minute).Unix()*1000, txTime.
+			Add(15*time.Minute).Unix()*1000)
+
+		if err != nil {
+			return err
+		}
+
+		price := float32(0)
+		// search for a value with a minimum difference from the transaction time
+		if len(prices) > 0 {
+			price = prices[0].Price
+			diff := v.Timestamp - prices[0].Timestamp
+			for _, p := range prices {
+				newDiff := v.Timestamp - p.Timestamp
+				if newDiff < 0 {
+					newDiff *= -1
+				}
+
+				if newDiff < diff {
+					diff = newDiff
+					price = p.Price
+				}
+			}
+		}
+
+		value, _ := new(big.Int).SetString(v.Value, 10)
+		fee, _ := new(big.Int).SetString(v.Fee, 10)
+
+		floatValue := currency.ConvertFromPlanck(value)
+		floatFee := currency.ConvertFromPlanck(fee)
+
+		a := currency.Accuracy()
+		aBig := new(big.Float).SetInt(big.NewInt(a))
+
+		fv, _ := new(big.Float).Mul(floatValue, aBig).Float32()
+		fv /= float32(a)
+		usdValue := price * fv
+
+		ff, _ := new(big.Float).Mul(floatFee, aBig).Float32()
+		ff /= float32(a)
+		usdFee := price * ff
+
+		userFrom := ""
+		p, err := c.db.ProfileByAddress(v.From)
+		if err != nil && err != db.ErrNoRows {
+			return err
+		}
+		if p != nil {
+			userFrom = p.Id
+		}
+
+		userTo := ""
+		p, err = c.db.ProfileByAddress(v.To)
+		if err != nil && err != db.ErrNoRows {
+			return err
+		}
+		if p != nil {
+			userTo = p.Id
+		}
+
+		responseTxs = append(responseTxs, Transaction{
+			ID:       v.ID,
+			Currency: v.Currency,
+
+			From:     v.From,
+			UserFrom: userFrom,
+
+			To:     v.To,
+			UserTo: userTo,
+
+			Value:      v.Value,
+			UsdValue:   usdValue,
+			FloatValue: floatValue.String(),
+
+			Fee:       v.Fee,
+			UsdFee:    usdFee,
+			FloatFee:  floatFee.String(),
+			Timestamp: v.Timestamp,
+			Status:    v.Status,
+		})
+	}
+
+	rsByte, err := json.Marshal(responseTxs)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// username godoc
+// @Summary Get tx status
+// @ID getTxStatus
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param hash query string true "hash"
+// @Success 200 {object} TxStatusRs
+// @Failure 400 {string} string
+// @Router /profile/transaction/status [get]
+func (c *Controller) transactionStatus(w http.ResponseWriter, r *http.Request) error {
+	hash := r.URL.Query().Get("hash")
+
+	resp, err := http.Get(fmt.Sprintf("%s/transaction/%s", c.txApiHost, hash))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	status := new(TxStatusRs)
+	err = json.Unmarshal(body, &status)
+
+	if err != nil {
+		return err
+	}
+
+	rsByte, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// username godoc
+// @Summary Get substrateBalance by address
+// @ID getBalance
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param address query string true "address"
+// @Param currency query int true "currency"
+// @Success 200 {object} Balance
+// @Failure 400 {string} string
+// @Router /profile/substrateBalance [get]
+func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) error {
+	address := r.URL.Query().Get("address")
+	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
+	if err != nil {
+		return err
+	}
+	currency := types.Currency(currencyInt)
+
+	resp, err := http.Get(fmt.Sprintf("%s/substrate/balance/%s?currency=%s", c.txApiHost, address, currency.String()))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	balance := new(Balance)
+	err = json.Unmarshal(body, &balance)
+	if err != nil {
+		return err
+	}
+
+	rsByte, err := json.Marshal(balance)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+	return nil
 }

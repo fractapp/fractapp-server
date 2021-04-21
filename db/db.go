@@ -26,6 +26,7 @@ type DB interface {
 	ProfileByMatchedPhoneNumber(contactPhoneNumber string, myPhoneNumber string) (*Profile, error)
 	ProfileByPhoneNumber(phoneNumber string) (*Profile, error)
 	ProfileByEmail(email string) (*Profile, error)
+	ProfilesCount() (int, error)
 
 	CreateProfile(ctx context.Context, profile *Profile, addresses []*Address) error
 	IdByToken(token string) (string, error)

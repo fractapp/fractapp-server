@@ -9,6 +9,7 @@ import (
 	"fractapp-server/config"
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
+	"fractapp-server/controller/info"
 	internalMiddleware "fractapp-server/controller/middleware"
 	notificationController "fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
@@ -32,12 +33,6 @@ import (
 var host = "127.0.0.1:9544"
 var configPath = "config.json"
 
-func init() {
-	flag.StringVar(&host, "host", host, "host for server")
-	flag.StringVar(&configPath, "config", configPath, "config file")
-	flag.Parse()
-}
-
 // @contact.name Support
 // @contact.email support@fractapp.com
 // @license.name Apache 2.0
@@ -59,6 +54,12 @@ func init() {
 // @securityDefinitions.apikey AuthWithPubKey-Auth-Key
 // @in header
 // @name Auth-Key
+
+func init() {
+	flag.StringVar(&host, "host", host, "host for server")
+	flag.StringVar(&configPath, "config", configPath, "config file")
+	flag.Parse()
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -121,13 +122,14 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		config.SMSService.AccountSid, config.SMSService.AuthToken)
 
 	nController := notificationController.NewController(pgDb)
-	pController := profile.NewController(pgDb)
+	pController := profile.NewController(pgDb, config.TransactionApi)
 	authController := auth.NewController(
 		pgDb,
 		twilioApi,
 		emailClient,
 		tokenAuth,
 	)
+	infoController := info.NewController(pgDb, config.SubstrateUrls)
 
 	authMiddleware := internalMiddleware.New(pgDb)
 
@@ -147,6 +149,7 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		})
 	})
 
+	//TODO: will switch to another framework
 	r.Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(tokenAuth))
 		r.Use(authMiddleware.JWTAuth)
@@ -167,7 +170,11 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Get(pController.MainRoute()+profile.AvatarRoute+"/*", controller.Route(pController, profile.AvatarRoute))
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
-		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))
+		r.Get(pController.MainRoute()+profile.UserInfoRoute, controller.Route(pController, profile.UserInfoRoute))
+		r.Get(pController.MainRoute()+profile.TransactionsRoute, controller.Route(pController, profile.TransactionsRoute))
+		r.Get(pController.MainRoute()+profile.TransactionStatusRoute, controller.Route(pController, profile.TransactionStatusRoute))
+		r.Get(pController.MainRoute()+profile.SubstrateBalanceRoute, controller.Route(pController, profile.SubstrateBalanceRoute))
+		r.Get(infoController.MainRoute()+info.TotalRoute, controller.Route(infoController, info.TotalRoute))
 
 		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 

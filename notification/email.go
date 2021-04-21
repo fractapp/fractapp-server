@@ -12,8 +12,7 @@ import (
 )
 
 var (
-	InvalidSendEmailErr = errors.New("invalid send notification")
-	InvalidEmailErr     = errors.New("invalid email address")
+	InvalidEmailErr = errors.New("invalid email address")
 )
 
 const (
@@ -46,6 +45,8 @@ func (client *SMTP) Format(receiver string) string {
 
 func (client *SMTP) Validate(receiver string) error {
 	if strings.Count(receiver, "@") == 0 {
+		return InvalidEmailErr
+	} else if len(receiver) < 3 {
 		return InvalidEmailErr
 	}
 	return nil

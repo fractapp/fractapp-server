@@ -1,22 +1,62 @@
 package types
 
-import "math/big"
+import (
+	"math/big"
+	"strings"
+)
 
 type Currency int
 
 const (
 	DOT Currency = iota
 	KSM
-
-	accuracy = 1000
 )
 
-func (c Currency) ConvertFromPlanck(amount *big.Int) float64 {
+var Currencies = []Currency{
+	DOT,
+	KSM,
+}
+
+func (c Currency) ConvertFromPlanck(amount *big.Int) *big.Float {
 	decimals := c.Decimals()
 
-	amount.Mul(amount, big.NewInt(accuracy)).
-		Div(amount, big.NewInt(decimals).Exp(big.NewInt(10), big.NewInt(decimals), nil))
-	return float64(amount.Int64()) / accuracy
+	d := new(big.Int)
+	d.Exp(big.NewInt(10), big.NewInt(decimals), nil)
+
+	return new(big.Float).Quo(new(big.Float).SetInt(amount), new(big.Float).SetInt(d))
+}
+
+func (c Currency) Accuracy() int64 {
+	switch c {
+	case DOT:
+		return 1000
+	case KSM:
+		return 1000
+	}
+
+	return 1000
+}
+
+func (c Currency) ConvertFromPlanckToView(amount *big.Int) *big.Float {
+	decimals := c.Decimals()
+
+	d := new(big.Int)
+	d.Exp(big.NewInt(10), big.NewInt(decimals), nil)
+
+	return new(big.Float).Quo(new(big.Float).SetInt(amount), new(big.Float).SetInt(d))
+}
+
+func ParseCurrency(name string) (c Currency) {
+	c = DOT
+
+	switch strings.ToLower(name) {
+	case "DOT":
+		c = DOT
+	case "KSM":
+		c = KSM
+	}
+
+	return c
 }
 
 func (c Currency) Decimals() int64 {

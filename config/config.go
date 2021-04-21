@@ -6,13 +6,14 @@ import (
 )
 
 type Config struct {
-	BinanceApi  string
-	AdaptorUrls map[string]string
-	SMSService  SMSService
-	Firebase    Firebase
-	DB          DB
-	Secret      string
-	SMTP        `json:"SMTP"`
+	TransactionApi string
+	SubstrateUrls  map[string]string
+	BinanceApi     string
+	SMSService     SMSService
+	Firebase       Firebase
+	DB             DB
+	Secret         string
+	SMTP           `json:"SMTP"`
 }
 
 type SMTP struct {
@@ -44,10 +45,11 @@ func Parse(path string) (*Config, error) {
 	config := &Config{}
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
-		return config, err
+		return nil, err
 	}
+
 	if err := json.Unmarshal(file, config); err != nil {
-		return config, err
+		return nil, err
 	}
 	return config, nil
 }

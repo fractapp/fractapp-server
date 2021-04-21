@@ -54,6 +54,17 @@ definitions:
         description: JWT token
         type: string
     type: object
+  info.TotalInfo:
+    properties:
+      price:
+        additionalProperties:
+          type: number
+        type: object
+      substrateUrls:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   notification.UpdateTokenRq:
     properties:
       address:
@@ -73,6 +84,11 @@ definitions:
         type: integer
       token:
         description: firebase token
+        type: string
+    type: object
+  profile.Balance:
+    properties:
+      value:
         type: string
     type: object
   profile.MyProfile:
@@ -120,6 +136,42 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  profile.Transaction:
+    properties:
+      currency:
+        type: integer
+      fee:
+        type: string
+      floatFee:
+        type: string
+      floatValue:
+        type: string
+      from:
+        type: string
+      id:
+        type: string
+      status:
+        type: integer
+      timestamp:
+        type: integer
+      to:
+        type: string
+      usdFee:
+        type: number
+      usdValue:
+        type: number
+      userFrom:
+        type: string
+      userTo:
+        type: string
+      value:
+        type: string
+    type: object
+  profile.TxStatusRs:
+    properties:
+      status:
+        type: integer
     type: object
   profile.UpdateProfileRq:
     properties:
@@ -209,6 +261,26 @@ paths:
       summary: Sign in
       tags:
       - Authorization
+  /info/total:
+    get:
+      consumes:
+      - application/json
+      description: get user by id or blockchain address
+      operationId: info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/info.TotalInfo'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get total info
+      tags:
+      - Info
   /notification/subscribe:
     post:
       consumes:
@@ -257,6 +329,36 @@ paths:
       summary: Get user avatar
       tags:
       - Profile
+  /profile/balance:
+    get:
+      consumes:
+      - application/json
+      operationId: getBalance
+      parameters:
+      - description: address
+        in: query
+        name: address
+        required: true
+        type: string
+      - description: currency
+        in: query
+        name: currency
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.Balance'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get balance by address
+      tags:
+      - Profile
   /profile/contacts:
     get:
       consumes:
@@ -285,7 +387,7 @@ paths:
       consumes:
       - application/json
       description: get user by id or blockchain address
-      operationId: info
+      operationId: profileInfo
       parameters:
       - description: get user profile by user id
         in: query
@@ -387,6 +489,61 @@ paths:
       summary: Search user
       tags:
       - Profile
+  /profile/transaction/status:
+    get:
+      consumes:
+      - application/json
+      operationId: getTxStatus
+      parameters:
+      - description: hash
+        in: query
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.TxStatusRs'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get tx status
+      tags:
+      - Profile
+  /profile/transactions:
+    get:
+      consumes:
+      - application/json
+      operationId: getTransactions
+      parameters:
+      - description: address
+        in: query
+        name: address
+        required: true
+        type: string
+      - description: currency
+        in: query
+        name: currency
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get transactions by address
+      tags:
+      - Profile
   /profile/updateProfile:
     post:
       consumes:
@@ -475,23 +632,13 @@ paths:
     get:
       consumes:
       - application/json
-      operationId: getTransactions
+      operationId: username
       parameters:
-      - description: address
+      - description: username min length 4
         in: query
-        name: address
+        name: username
         required: true
         type: string
-      - description: page
-        in: query
-        name: page
-        required: true
-        type: integer
-      - description: size
-        in: query
-        name: size
-        required: true
-        type: integer
       produces:
       - application/json
       responses:
@@ -505,7 +652,7 @@ paths:
           description: Not Found
           schema:
             type: string
-      summary: get transaction by address
+      summary: Is username exist?
       tags:
       - Profile
 securityDefinitions:

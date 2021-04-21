@@ -31,3 +31,12 @@ func TestIsValidNameMinUsernameLength(t *testing.T) {
 func TestIsValidNameMatchRegExp(t *testing.T) {
 	assert.Assert(t, !IsValidName("Test test123@"))
 }
+
+func TestIsValidNameWithFractapper(t *testing.T) {
+	assert.Assert(t, !IsValidUsername("fractapper"))
+	assert.Assert(t, !IsValidUsername("     fractapper"))
+	assert.Assert(t, !IsValidUsername("     fractapper      "))
+	assert.Assert(t, !IsValidUsername("fractapper     "))
+
+	assert.Assert(t, !IsValidUsername("fractapper12345"))
+}

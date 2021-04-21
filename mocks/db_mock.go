@@ -349,6 +349,36 @@ func (mr *MockDBMockRecorder) SubscribersCount() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribersCount", reflect.TypeOf((*MockDB)(nil).SubscribersCount))
 }
 
+// Prices mocks base method
+func (m *MockDB) Prices(currency string, startTime, endTime int64) ([]db.Price, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Prices", currency, startTime, endTime)
+	ret0, _ := ret[0].([]db.Price)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Prices indicates an expected call of Prices
+func (mr *MockDBMockRecorder) Prices(currency, startTime, endTime interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prices", reflect.TypeOf((*MockDB)(nil).Prices), currency, startTime, endTime)
+}
+
+// LastPriceByCurrency mocks base method
+func (m *MockDB) LastPriceByCurrency(currency string) (*db.Price, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LastPriceByCurrency", currency)
+	ret0, _ := ret[0].(*db.Price)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LastPriceByCurrency indicates an expected call of LastPriceByCurrency
+func (mr *MockDBMockRecorder) LastPriceByCurrency(currency interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastPriceByCurrency", reflect.TypeOf((*MockDB)(nil).LastPriceByCurrency), currency)
+}
+
 // Insert mocks base method
 func (m *MockDB) Insert(value interface{}) error {
 	m.ctrl.T.Helper()
@@ -361,6 +391,20 @@ func (m *MockDB) Insert(value interface{}) error {
 func (mr *MockDBMockRecorder) Insert(value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockDB)(nil).Insert), value)
+}
+
+// InsertBatch mocks base method
+func (m *MockDB) InsertBatch(ctx context.Context, values []interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertBatch", ctx, values)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertBatch indicates an expected call of InsertBatch
+func (mr *MockDBMockRecorder) InsertBatch(ctx, values interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertBatch", reflect.TypeOf((*MockDB)(nil).InsertBatch), ctx, values)
 }
 
 // UpdateByPK mocks base method

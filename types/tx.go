@@ -2,7 +2,8 @@ package types
 
 import "math/big"
 
-type Tx struct {
+type AdaptorTx struct {
+	EventID    string
 	Sender     string
 	Receiver   string
 	FullAmount *big.Int

@@ -1,28 +1,28 @@
-package adaptors
+package substrate
 
 import (
+	"fmt"
 	ftypes "fractapp-server/types"
-
-	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
-	log "github.com/sirupsen/logrus"
+	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v2/rpc/chain"
+	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v2"
 )
 
-type SubstrateAdaptor struct {
+type Adaptor struct {
 	host       string
 	api        *gsrpc.SubstrateAPI
 	blockEvent *chain.FinalizedHeadsSubscription
 	network    ftypes.Network
 }
 
-func NewSubstrateAdaptor(host string, network ftypes.Network) *SubstrateAdaptor {
-	return &SubstrateAdaptor{host: host, network: network}
+func NewAdaptor(host string, network ftypes.Network) *Adaptor {
+	return &Adaptor{host: host, network: network}
 }
 
-func (a *SubstrateAdaptor) Connect() error {
+func (a *Adaptor) Connect() error {
 	api, err := gsrpc.NewSubstrateAPI(a.host)
 	if err != nil {
 		return err
@@ -32,7 +32,7 @@ func (a *SubstrateAdaptor) Connect() error {
 	return nil
 }
 
-func (a *SubstrateAdaptor) Subscribe() error {
+func (a *Adaptor) Subscribe() error {
 	newBlockEvent, err := a.api.RPC.Chain.SubscribeFinalizedHeads()
 	if err != nil {
 		return err
@@ -42,11 +42,11 @@ func (a *SubstrateAdaptor) Subscribe() error {
 	return nil
 }
 
-func (a *SubstrateAdaptor) Unsubscribe() {
+func (a *Adaptor) Unsubscribe() {
 	a.blockEvent.Unsubscribe()
 }
 
-func (a *SubstrateAdaptor) LastHeight() (uint64, error) {
+func (a *Adaptor) WaitNewBlock() (uint64, error) {
 	select {
 	case e := <-a.blockEvent.Chan():
 		return uint64(e.Number), nil
@@ -55,16 +55,15 @@ func (a *SubstrateAdaptor) LastHeight() (uint64, error) {
 	}
 }
 
-func (a *SubstrateAdaptor) Err() <-chan error {
+func (a *Adaptor) Err() <-chan error {
 	return a.blockEvent.Err()
 }
 
-func (a *SubstrateAdaptor) Transfers(blockNumber uint64) ([]ftypes.Tx, error) {
+func (a *Adaptor) Transfers(blockNumber uint64) ([]ftypes.Tx, error) {
 	hash, err := a.api.RPC.Chain.GetBlockHash(blockNumber)
 	if err != nil {
 		return nil, err
 	}
-	a.api.RPC.Chain.GetBlockHashLatest()
 	meta, err := a.api.RPC.State.GetMetadata(hash)
 	if err != nil {
 		return nil, err
@@ -86,32 +85,26 @@ func (a *SubstrateAdaptor) Transfers(blockNumber uint64) ([]ftypes.Tx, error) {
 		return nil, err
 	}
 
-	//fees := make(map[types.Hash]*big.Int)
+	fees := make(map[uint32]*big.Int)
 	for _, v := range events.Treasury_Deposit {
-		log.Info(len(v.Topics))
-		for _, c := range v.Topics {
-			log.Info(c.Hex())
-		}
-		//fees[v.Topics] = v.Deposited.Int
+		fees[v.Phase.AsApplyExtrinsic] = v.Deposited.Int
 	}
 	for _, v := range events.Balances_Deposit {
-		log.Info(len(v.Topics))
-		for _, c := range v.Topics {
-			log.Info(c.Hex())
+		if fee, ok := fees[v.Phase.AsApplyExtrinsic]; ok {
+			fees[v.Phase.AsApplyExtrinsic] = fee.Add(fee, v.Balance.Int)
+		} else {
+			fees[v.Phase.AsApplyExtrinsic] = v.Balance.Int
 		}
-		//fees[v.Topics] = v.Deposited.Int
 	}
+
 	var txs []ftypes.Tx
 	for _, v := range events.Balances_Transfer {
-		log.Info(len(v.Topics))
-		for _, c := range v.Topics {
-			log.Info(c.Hex())
-		}
-
 		txs = append(txs, ftypes.Tx{
+			EventID:    fmt.Sprintf("%d-%d", blockNumber, v.Phase.AsApplyExtrinsic),
 			Sender:     a.network.Address(v.From[:]),
 			Receiver:   a.network.Address(v.To[:]),
 			FullAmount: v.Value.Int,
+			Fee:        fees[v.Phase.AsApplyExtrinsic],
 		})
 	}
 
