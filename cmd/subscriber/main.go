@@ -167,7 +167,7 @@ func sendNotification(ownerAddress string, memberAddress string, txType firebase
 	if err == db.ErrNoRows || profile == nil {
 		msg := notificator.MsgForAddress(memberAddress, txType, fAmount, currency)
 		log.Infof("Notify (%s): %s \n", sub.Address, msg)
-		err = notificator.Notify(msg, "", sub.Token)
+		err = notificator.Notify("", msg, sub.Token)
 	} else {
 		msg := notificator.MsgForAuthed(txType, fAmount, currency)
 		log.Infof("Notify (%s): %s \n", sub.Address, msg)
