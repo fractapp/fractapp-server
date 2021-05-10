@@ -167,10 +167,15 @@ func sendNotification(ownerAddress string, memberAddress string, txType firebase
 	if err == db.ErrNoRows || profile == nil {
 		msg := notificator.MsgForAddress(memberAddress, txType, fAmount, currency)
 		log.Infof("Notify (%s): %s \n", sub.Address, msg)
-		err = notificator.Notify("", msg, sub.Token)
+
+		notifyErr := notificator.Notify("", msg, sub.Token)
+		if notifyErr != nil {
+			log.Errorf("%d \n", notifyErr)
+		}
 	} else {
 		msg := notificator.MsgForAuthed(txType, fAmount, currency)
 		log.Infof("Notify (%s): %s \n", sub.Address, msg)
+
 		name := ""
 		if profile.Name != "" {
 			name = profile.Name
@@ -178,10 +183,10 @@ func sendNotification(ownerAddress string, memberAddress string, txType firebase
 			name = "@" + profile.Username
 		}
 
-		err = notificator.Notify(name, msg, sub.Token)
-	}
-	if err != nil {
-		return err
+		notifyErr := notificator.Notify(name, msg, sub.Token)
+		if notifyErr != nil {
+			log.Errorf("%d \n", notifyErr)
+		}
 	}
 
 	return nil

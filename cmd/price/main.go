@@ -133,8 +133,8 @@ func startScanForCurrency(database db.DB, ctx context.Context) error {
 }
 
 func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) error {
-	log.Printf("scan start time: %s", time.Unix(startTime/1000, 0).String())
-	log.Printf("scan end time: %s", time.Unix(endTime/1000, 0).String())
+	log.Infof("scan start time: %d", startTime/1000)
+	log.Infof("scan end time: %d", endTime/1000)
 
 	resp, err := http.Get(fmt.Sprintf(
 		"https://%s/api/v3/klines?symbol=%sUSDT&startTime=%d&endTime=%d&limit=%d&interval=%dm",
