@@ -140,7 +140,7 @@ func notifyRoute(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	err = sendNotification(nRq.To, nRq.To, firebase.Received, currency, nRq.Value)
+	err = sendNotification(nRq.To, nRq.From, firebase.Received, currency, nRq.Value)
 	if err != nil {
 		return err
 	}
@@ -148,8 +148,8 @@ func notifyRoute(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func sendNotification(ownerAddress string, memberAddress string, txType firebase.TxType, currency types.Currency, value string) error {
-	sub, err := database.SubscriberByAddress(ownerAddress)
+func sendNotification(addressForNotificator string, memberAddress string, txType firebase.TxType, currency types.Currency, value string) error {
+	sub, err := database.SubscriberByAddress(addressForNotificator)
 	if err != nil && err != db.ErrNoRows {
 		return err
 	}
