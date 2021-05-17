@@ -21,8 +21,9 @@ const (
 )
 
 type TxNotificator interface {
-	Notify(msg string, token string) error
-	Msg(member string, txType TxType, amount float64, currency types.Currency) string
+	Notify(title string, msg string, token string) error
+	MsgForAuthed(txType TxType, amount float64, currency types.Currency) string
+	MsgForAddress(address string, txType TxType, amount float64, currency types.Currency) string
 }
 
 type Client struct {
@@ -48,22 +49,43 @@ func NewClient(ctx context.Context, credentialsFile string, projectId string) (*
 	}, nil
 }
 
-func (n *Client) Notify(msg string, token string) error {
-	n.msgClient.Send(n.ctx, &messaging.Message{
+func (n *Client) Notify(title string, msg string, token string) error {
+	_, err := n.msgClient.Send(n.ctx, &messaging.Message{
 		Notification: &messaging.Notification{
-			Body: msg,
+			Title: title,
+			Body:  msg,
+		},
+		Android: &messaging.AndroidConfig{
+			Notification: &messaging.AndroidNotification{
+				ChannelID: "chats",
+				Priority:  messaging.PriorityDefault,
+			},
 		},
 		Token: token,
 	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (n *Client) Msg(member string, txType TxType, amount float64, currency types.Currency) string {
+func (n *Client) MsgForAuthed(txType TxType, amount float64, currency types.Currency) string {
 	switch txType {
 	case Sent:
-		return fmt.Sprintf("You sent %.3f %s to %s", amount, currency.String(), member)
+		return fmt.Sprintf("You sent %.3f %s", amount, currency.String())
 	case Received:
-		return fmt.Sprintf("You received %.3f %s from %s", amount, currency.String(), member)
+		return fmt.Sprintf("You received %.3f %s", amount, currency.String())
+	}
+
+	return ""
+}
+
+func (n *Client) MsgForAddress(address string, txType TxType, amount float64, currency types.Currency) string {
+	switch txType {
+	case Sent:
+		return fmt.Sprintf("You sent %.3f %s to %s", amount, currency.String(), address)
+	case Received:
+		return fmt.Sprintf("You received %.3f %s from %s", amount, currency.String(), address)
 	}
 
 	return ""

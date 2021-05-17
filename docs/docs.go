@@ -146,6 +146,36 @@ var doc = `{
                 }
             }
         },
+        "/info/total": {
+            "get": {
+                "description": "get user by id or blockchain address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Info"
+                ],
+                "summary": "Get total info",
+                "operationId": "info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/info.TotalInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/notification/subscribe": {
             "post": {
                 "description": "subscribe for notifications about transaction",
@@ -219,6 +249,51 @@ var doc = `{
                 }
             }
         },
+        "/profile/balance": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get balance by address",
+                "operationId": "getBalance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "address",
+                        "name": "address",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.Balance"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/profile/contacts": {
             "get": {
                 "security": [
@@ -269,7 +344,7 @@ var doc = `{
                     "Profile"
                 ],
                 "summary": "Get user",
-                "operationId": "info",
+                "operationId": "profileInfo",
                 "parameters": [
                     {
                         "type": "string",
@@ -416,6 +491,89 @@ var doc = `{
                     },
                     "404": {
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/profile/transaction/status": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get tx status",
+                "operationId": "getTxStatus",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "hash",
+                        "name": "hash",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.TxStatusRs"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/transactions": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get transactions by address",
+                "operationId": "getTransactions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "address",
+                        "name": "address",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.Transaction"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -675,6 +833,23 @@ var doc = `{
                 }
             }
         },
+        "info.TotalInfo": {
+            "type": "object",
+            "properties": {
+                "price": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "substrateUrls": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "notification.UpdateTokenRq": {
             "type": "object",
             "properties": {
@@ -700,6 +875,14 @@ var doc = `{
                 },
                 "token": {
                     "description": "firebase token",
+                    "type": "string"
+                }
+            }
+        },
+        "profile.Balance": {
+            "type": "object",
+            "properties": {
+                "value": {
                     "type": "string"
                 }
             }
@@ -766,6 +949,61 @@ var doc = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "profile.Transaction": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "integer"
+                },
+                "fee": {
+                    "type": "string"
+                },
+                "floatFee": {
+                    "type": "string"
+                },
+                "floatValue": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "to": {
+                    "type": "string"
+                },
+                "usdFee": {
+                    "type": "number"
+                },
+                "usdValue": {
+                    "type": "number"
+                },
+                "userFrom": {
+                    "type": "string"
+                },
+                "userTo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "profile.TxStatusRs": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "integer"
                 }
             }
         },

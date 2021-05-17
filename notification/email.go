@@ -12,8 +12,7 @@ import (
 )
 
 var (
-	InvalidSendEmailErr = errors.New("invalid send notification")
-	InvalidEmailErr     = errors.New("invalid email address")
+	InvalidEmailErr = errors.New("invalid email address")
 )
 
 const (
@@ -47,6 +46,8 @@ func (client *SMTP) Format(receiver string) string {
 func (client *SMTP) Validate(receiver string) error {
 	if strings.Count(receiver, "@") == 0 {
 		return InvalidEmailErr
+	} else if len(receiver) < 3 {
+		return InvalidEmailErr
 	}
 	return nil
 }
@@ -54,7 +55,7 @@ func (client *SMTP) Validate(receiver string) error {
 func (client *SMTP) SendCode(receiver string, code string) error {
 	subj := "Activation code: " + code
 
-	t, err := template.ParseFiles("templates/auth.html")
+	t, err := template.ParseFiles("assets/auth.html")
 	if err != nil {
 		return err
 	}

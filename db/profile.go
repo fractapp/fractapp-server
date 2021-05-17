@@ -124,3 +124,7 @@ func (db *PgDB) CreateProfile(ctx context.Context, profile *Profile, addresses [
 
 	return nil
 }
+
+func (db *PgDB) ProfilesCount() (int, error) {
+	return db.Model(&Profile{}).Count()
+}

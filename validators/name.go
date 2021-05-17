@@ -2,6 +2,7 @@ package validators
 
 import (
 	"regexp"
+	"strings"
 )
 
 const (
@@ -12,6 +13,8 @@ const (
 
 	patternForUsername = "^[0-9a-z]*$"
 	patternForName     = "^[0-9a-zA-z ]*$"
+
+	UsernamePrefix = "fractapper"
 )
 
 func IsValidUsername(username string) bool {
@@ -23,6 +26,9 @@ func IsValidUsername(username string) bool {
 		return false
 	}
 
+	if strings.HasPrefix(username, UsernamePrefix) {
+		return false
+	}
 	return true
 }
 

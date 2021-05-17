@@ -1,9 +1,10 @@
 {
-  "BinanceApi": "",
+  "TransactionApi": "",
   "SubstrateUrls": {
     "Polkadot": "",
     "Kusama": ""
   },
+  "BinanceApi": "",
   "Firebase": {
     "ProjectId": ""
   },

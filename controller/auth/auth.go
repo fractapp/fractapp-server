@@ -3,14 +3,17 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/controller/middleware"
 	"fractapp-server/db"
 	"fractapp-server/notification"
 	"fractapp-server/types"
 	"fractapp-server/utils"
+	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -215,6 +218,9 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	rq.Value = c.notificator[rq.Type].Format(rq.Value)
+	if err := c.notificator[rq.Type].Validate(rq.Value); err != nil {
+		return err
+	}
 
 	//check confirm code
 	if err := c.confirm(rq.Value, rq.Type, notification.Auth, rq.Code); err != nil {
@@ -282,9 +288,22 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 			})
 		}
 
+		//Generate username
+		username := ""
+		min := 10
+		max := 30
+		fmt.Println(rand.Intn(max-min+1) + min)
+
+		total, err := c.db.ProfilesCount()
+		if err != nil {
+			return err
+		}
+		username = fmt.Sprintf("%s%d", validators.UsernamePrefix, total)
+
 		profile = &db.Profile{
 			Id:          id,
 			IsMigratory: false,
+			Username:    username,
 		}
 
 		switch rq.Type {

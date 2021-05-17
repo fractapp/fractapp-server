@@ -6,19 +6,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"fractapp-server/adaptors"
 	"fractapp-server/config"
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
+	"fractapp-server/controller/info"
 	internalMiddleware "fractapp-server/controller/middleware"
 	notificationController "fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
 	"fractapp-server/docs"
-	"fractapp-server/firebase"
 	"fractapp-server/notification"
-	"fractapp-server/scanner"
-	"fractapp-server/types"
 	"log"
 	"net/http"
 	"os"
@@ -35,12 +32,6 @@ import (
 
 var host = "127.0.0.1:9544"
 var configPath = "config.json"
-
-func init() {
-	flag.StringVar(&host, "host", host, "host for server")
-	flag.StringVar(&configPath, "config", configPath, "config file")
-	flag.Parse()
-}
 
 // @contact.name Support
 // @contact.email support@fractapp.com
@@ -64,17 +55,23 @@ func init() {
 // @in header
 // @name Auth-Key
 
-func main() {
-	ctx := context.Background()
+func init() {
+	flag.StringVar(&host, "host", host, "host for server")
+	flag.StringVar(&configPath, "config", configPath, "config file")
+	flag.Parse()
+}
 
-	err := start(ctx)
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	err := start(ctx, cancel)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func start(ctx context.Context) error {
-	log.Println("Setup notification service")
+func start(ctx context.Context, cancel context.CancelFunc) error {
+	log.Println("Setup api service")
 	// parse config
 	config, err := config.Parse(configPath)
 	if err != nil {
@@ -125,13 +122,14 @@ func start(ctx context.Context) error {
 		config.SMSService.AccountSid, config.SMSService.AuthToken)
 
 	nController := notificationController.NewController(pgDb)
-	pController := profile.NewController(pgDb)
+	pController := profile.NewController(pgDb, config.TransactionApi)
 	authController := auth.NewController(
 		pgDb,
 		twilioApi,
 		emailClient,
 		tokenAuth,
 	)
+	infoController := info.NewController(pgDb, config.SubstrateUrls)
 
 	authMiddleware := internalMiddleware.New(pgDb)
 
@@ -151,6 +149,7 @@ func start(ctx context.Context) error {
 		})
 	})
 
+	//TODO: will switch to another framework
 	r.Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(tokenAuth))
 		r.Use(authMiddleware.JWTAuth)
@@ -171,7 +170,10 @@ func start(ctx context.Context) error {
 		r.Get(pController.MainRoute()+profile.AvatarRoute+"/*", controller.Route(pController, profile.AvatarRoute))
 		r.Get(pController.MainRoute()+profile.UsernameRoute, controller.Route(pController, profile.UsernameRoute))
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
-		r.Get(pController.MainRoute()+profile.InfoRoute, controller.Route(pController, profile.InfoRoute))
+		r.Get(pController.MainRoute()+profile.UserInfoRoute, controller.Route(pController, profile.UserInfoRoute))
+		r.Get(pController.MainRoute()+profile.TransactionsRoute, controller.Route(pController, profile.TransactionsRoute))
+		r.Get(pController.MainRoute()+profile.SubstrateBalanceRoute, controller.Route(pController, profile.SubstrateBalanceRoute))
+		r.Get(infoController.MainRoute()+info.TotalRoute, controller.Route(infoController, info.TotalRoute))
 
 		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 
@@ -195,32 +197,15 @@ func start(ctx context.Context) error {
 
 	log.Printf("http: Server listen: %s", host)
 
-	n, err := firebase.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
-	if err != nil {
-		return err
-	}
-	for k, url := range config.SubstrateUrls {
-		network := types.ParseNetwork(k)
-		adaptor := adaptors.NewSubstrateAdaptor(url, network)
-		bs := scanner.NewBlockScanner(pgDb, network.String(), network, n, adaptor)
-		go func() {
-			err = bs.Start()
-			if err != nil {
-				log.Printf("%s scanner down: %s \n", network.String(), err)
-			}
-		}()
-		log.Printf("Event scanner for %s started \n", k)
-	}
-
 	// await exit signal
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
 
-	exitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
+	exitCtx, shutDownCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer shutDownCancel()
 	srv.Shutdown(exitCtx)
 
+	cancel()
 	return nil
 }

@@ -22,7 +22,7 @@ func init() {
 	"username" varchar(32)
 		constraint username_pk
             unique,
-    "notification"   varchar(256)
+    "email"   varchar(256)
 		constraint email_pk
             unique,
 	"is_migratory" boolean,
