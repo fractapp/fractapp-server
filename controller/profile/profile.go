@@ -24,18 +24,19 @@ import (
 )
 
 const (
-	UpdateProfileRoute    = "/updateProfile"
-	UsernameRoute         = "/username"
-	UploadAvatarRoute     = "/uploadAvatar"
-	MyProfileRoute        = "/my"
-	SearchRoute           = "/search"
-	MyContactsRoute       = "/contacts"
-	UploadContactsRoute   = "/uploadContacts"
-	MyMatchContactsRoute  = "/matchContacts"
-	UserInfoRoute         = "/userInfo"
-	AvatarRoute           = "/avatar"
-	TransactionsRoute     = "/transactions"
-	SubstrateBalanceRoute = "/substrate/balance"
+	UpdateProfileRoute     = "/updateProfile"
+	UsernameRoute          = "/username"
+	UploadAvatarRoute      = "/uploadAvatar"
+	MyProfileRoute         = "/my"
+	SearchRoute            = "/search"
+	MyContactsRoute        = "/contacts"
+	UploadContactsRoute    = "/uploadContacts"
+	MyMatchContactsRoute   = "/matchContacts"
+	UserInfoRoute          = "/userInfo"
+	AvatarRoute            = "/avatar"
+	TransactionsRoute      = "/transactions"
+	SubstrateBalanceRoute  = "/substrate/balance"
+	TransactionStatusRoute = "/transaction/status"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -96,6 +97,8 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.transactions, nil
 	case SubstrateBalanceRoute:
 		return c.substrateBalance, nil
+	case TransactionStatusRoute:
+		return c.transactionStatus, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -783,6 +786,52 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	rsByte, err := json.Marshal(responseTxs)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// username godoc
+// @Summary Get tx status
+// @ID getTxStatus
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param hash query string true "hash"
+// @Success 200 {object} TxStatusRs
+// @Failure 400 {string} string
+// @Router /profile/transaction/status [get]
+func (c *Controller) transactionStatus(w http.ResponseWriter, r *http.Request) error {
+	hash := r.URL.Query().Get("hash")
+
+	resp, err := http.Get(fmt.Sprintf("%s/transaction/%s", c.txApiHost, hash))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	status := new(TxStatusRs)
+	err = json.Unmarshal(body, &status)
+
+	if err != nil {
+		return err
+	}
+
+	rsByte, err := json.Marshal(status)
 	if err != nil {
 		return err
 	}
