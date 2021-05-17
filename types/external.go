@@ -2,6 +2,7 @@ package types
 
 type Transaction struct {
 	ID        string `json:"id"`
+	Hash      string `json:"hash"`
 	Currency  int    `json:"currency"`
 	To        string `json:"to"`
 	From      string `json:"from"`

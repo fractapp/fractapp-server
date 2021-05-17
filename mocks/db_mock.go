@@ -245,6 +245,21 @@ func (mr *MockDBMockRecorder) ProfileByEmail(email interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfileByEmail", reflect.TypeOf((*MockDB)(nil).ProfileByEmail), email)
 }
 
+// ProfilesCount mocks base method
+func (m *MockDB) ProfilesCount() (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProfilesCount")
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProfilesCount indicates an expected call of ProfilesCount
+func (mr *MockDBMockRecorder) ProfilesCount() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfilesCount", reflect.TypeOf((*MockDB)(nil).ProfilesCount))
+}
+
 // CreateProfile mocks base method
 func (m *MockDB) CreateProfile(ctx context.Context, profile *db.Profile, addresses []*db.Address) error {
 	m.ctrl.T.Helper()

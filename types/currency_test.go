@@ -53,7 +53,9 @@ func TestConvertFromPlanck(t *testing.T) {
 	amount := big.NewInt(0)
 	amount.SetString("12567899900000", 10)
 
-	if c.ConvertFromPlanck(amount) != 1256.789 {
+	f := new(big.Float)
+	f, _ = f.SetString("1256.78999")
+	if c.ConvertFromPlanck(amount).Cmp(f) != 0 {
 		t.Fatal()
 	}
 }

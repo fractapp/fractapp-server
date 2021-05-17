@@ -35,29 +35,43 @@ func (m *MockTxNotificator) EXPECT() *MockTxNotificatorMockRecorder {
 }
 
 // Notify mocks base method
-func (m *MockTxNotificator) Notify(msg, token string) error {
+func (m *MockTxNotificator) Notify(title, msg, token string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Notify", msg, token)
+	ret := m.ctrl.Call(m, "Notify", title, msg, token)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Notify indicates an expected call of Notify
-func (mr *MockTxNotificatorMockRecorder) Notify(msg, token interface{}) *gomock.Call {
+func (mr *MockTxNotificatorMockRecorder) Notify(title, msg, token interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockTxNotificator)(nil).Notify), msg, token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockTxNotificator)(nil).Notify), title, msg, token)
 }
 
-// Msg mocks base method
-func (m *MockTxNotificator) Msg(member string, txType firebase.TxType, amount float64, currency types.Currency) string {
+// MsgForAuthed mocks base method
+func (m *MockTxNotificator) MsgForAuthed(txType firebase.TxType, amount float64, currency types.Currency) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Msg", member, txType, amount, currency)
+	ret := m.ctrl.Call(m, "MsgForAuthed", txType, amount, currency)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-// Msg indicates an expected call of Msg
-func (mr *MockTxNotificatorMockRecorder) Msg(member, txType, amount, currency interface{}) *gomock.Call {
+// MsgForAuthed indicates an expected call of MsgForAuthed
+func (mr *MockTxNotificatorMockRecorder) MsgForAuthed(txType, amount, currency interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Msg", reflect.TypeOf((*MockTxNotificator)(nil).Msg), member, txType, amount, currency)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MsgForAuthed", reflect.TypeOf((*MockTxNotificator)(nil).MsgForAuthed), txType, amount, currency)
+}
+
+// MsgForAddress mocks base method
+func (m *MockTxNotificator) MsgForAddress(address string, txType firebase.TxType, amount float64, currency types.Currency) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MsgForAddress", address, txType, amount, currency)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// MsgForAddress indicates an expected call of MsgForAddress
+func (mr *MockTxNotificatorMockRecorder) MsgForAddress(address, txType, amount, currency interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MsgForAddress", reflect.TypeOf((*MockTxNotificator)(nil).MsgForAddress), address, txType, amount, currency)
 }

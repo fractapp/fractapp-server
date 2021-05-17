@@ -26,8 +26,10 @@ type ShortUserProfile struct {
 }
 
 type Transaction struct {
-	ID       string `json:"id"`
-	Currency int    `json:"currency"`
+	ID   string `json:"id"`
+	Hash string `json:"hash"`
+
+	Currency int `json:"currency"`
 
 	From     string `json:"from"`
 	UserFrom string `json:"userFrom"`

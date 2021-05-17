@@ -172,7 +172,6 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
 		r.Get(pController.MainRoute()+profile.UserInfoRoute, controller.Route(pController, profile.UserInfoRoute))
 		r.Get(pController.MainRoute()+profile.TransactionsRoute, controller.Route(pController, profile.TransactionsRoute))
-		r.Get(pController.MainRoute()+profile.TransactionStatusRoute, controller.Route(pController, profile.TransactionStatusRoute))
 		r.Get(pController.MainRoute()+profile.SubstrateBalanceRoute, controller.Route(pController, profile.SubstrateBalanceRoute))
 		r.Get(infoController.MainRoute()+info.TotalRoute, controller.Route(infoController, info.TotalRoute))
 

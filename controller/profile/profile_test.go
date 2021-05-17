@@ -27,7 +27,7 @@ import (
 
 func TestMainRoute(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	controller := NewController(mocks.NewMockDB(ctrl))
+	controller := NewController(mocks.NewMockDB(ctrl), "")
 	assert.Equal(t, controller.MainRoute(), "/profile")
 }
 
@@ -44,7 +44,7 @@ func testErr(t *testing.T, controller *Controller, err error) {
 }
 func TestReturnErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	controller := NewController(mocks.NewMockDB(ctrl))
+	controller := NewController(mocks.NewMockDB(ctrl), "")
 
 	testErr(t, controller, UsernameNotFoundErr)
 	testErr(t, controller, errors.New("any errors"))
@@ -54,7 +54,7 @@ func TestSearchByUsername(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	value := "value"
 	profiles := []db.Profile{
@@ -76,6 +76,8 @@ func TestSearchByUsername(t *testing.T) {
 			Network: types.Polkadot,
 		},
 	}
+
+	mockDb.EXPECT().SearchUsersByEmail(value).Return(nil, db.ErrNoRows)
 	mockDb.EXPECT().SearchUsersByUsername(value, 10).Return(profiles, nil)
 	mockDb.EXPECT().AddressesById(profiles[0].Id).Return(addresses, nil)
 
@@ -121,7 +123,7 @@ func TestSearchByEmail(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	value := "value@test.com"
 	profile := &db.Profile{
@@ -187,7 +189,7 @@ func TestSearchMinSearchLength(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	value := "val"
 
@@ -221,7 +223,7 @@ func TestProfileInfoById(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	originalId := "      123123      "
 	id := strings.Trim(originalId, " ")
@@ -282,76 +284,11 @@ func TestProfileInfoById(t *testing.T) {
 	assert.Assert(t, returnErr == nil)
 	assert.DeepEqual(t, user, returnUser)
 }
-func TestProfileInfoByAddress(t *testing.T) {
-	ctrl := gomock.NewController(t)
-
-	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
-
-	originalAddress := "      address      "
-	address := strings.Trim(originalAddress, " ")
-
-	profileInfo, err := controller.Handler("/userInfo")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	profile := &db.Profile{
-		Id:          "idOne",
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
-	user := &ShortUserProfile{
-		Id:         profile.Id,
-		Name:       profile.Name,
-		Username:   profile.Username,
-		AvatarExt:  profile.AvatarExt,
-		LastUpdate: profile.LastUpdate,
-		Addresses:  make(map[types.Currency]string),
-	}
-	addresses := []db.Address{
-		{
-			Id:      "addressId",
-			Address: "address",
-			Network: types.Polkadot,
-		},
-	}
-	for _, v := range addresses {
-		user.Addresses[v.Network.Currency()] = v.Address
-	}
-
-	mockDb.EXPECT().ProfileByAddress(address).Return(profile, nil)
-	mockDb.EXPECT().AddressesById(profile.Id).Return(addresses, nil)
-
-	w := httptest.NewRecorder()
-	url, err := url.Parse("http://localhost:80/userInfo?address=" + address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	httpRq := &http.Request{
-		URL: url,
-	}
-	returnErr := profileInfo(w, httpRq)
-
-	returnUser := &ShortUserProfile{}
-	err = json.Unmarshal(w.Body.Bytes(), returnUser)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Assert(t, returnErr == nil)
-	assert.DeepEqual(t, user, returnUser)
-}
 func TestMyProfile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	id := "id"
 	profileInfo, err := controller.Handler("/my")
@@ -403,7 +340,7 @@ func TestUpdateProfile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	id := "id"
 	profileInfo, err := controller.Handler("/updateProfile")
@@ -458,7 +395,7 @@ func TestMyContacts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	id := "id"
 	profileInfo, err := controller.Handler("/contacts")
@@ -509,7 +446,7 @@ func TestMyMatchContacts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	id := "id"
 	myMatchContacts, err := controller.Handler("/matchContacts")
@@ -626,7 +563,7 @@ func TestUploadMyContacts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	id := "id"
 	existContacts := []db.Contact{
@@ -688,7 +625,7 @@ func TestFindUsername(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	originalUsername := "UserName"
 	username := strings.ToLower(originalUsername)
@@ -716,7 +653,7 @@ func TestFindUsernameNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	originalUsername := "UserName"
 	username := strings.ToLower(originalUsername)
@@ -745,7 +682,7 @@ func TestUploadAvatar(t *testing.T) {
 
 	id := "id"
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	var body bytes.Buffer
 
@@ -797,7 +734,7 @@ func TestUploadAvatarInvalidFormat(t *testing.T) {
 
 	id := "id"
 	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb)
+	controller := NewController(mockDb, "")
 
 	var body bytes.Buffer
 

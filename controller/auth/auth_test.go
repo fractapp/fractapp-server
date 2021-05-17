@@ -564,6 +564,8 @@ func TestSignForNewUser(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "auth_id", id)
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
+	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
+
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
 	mockDb.EXPECT().ProfileById(id).Return(nil, db.ErrNoRows)
 	mockDb.EXPECT().ProfileByPhoneNumber(rq.Value).Return(nil, db.ErrNoRows)
@@ -584,6 +586,7 @@ func TestSignForNewUser(t *testing.T) {
 		Id:          id,
 		IsMigratory: false,
 		PhoneNumber: rq.Value,
+		Username:    "fractapper10",
 	}
 	addresses := []*db.Address{
 		{
@@ -597,6 +600,7 @@ func TestSignForNewUser(t *testing.T) {
 			Network: types.Kusama,
 		},
 	}
+	mockDb.EXPECT().ProfilesCount().Return(10, nil)
 	mockDb.EXPECT().CreateProfile(ctx, gomock.Eq(profile), gomock.Eq(addresses)).Return(nil)
 	mockDb.EXPECT().TokenById(id).Return("", db.ErrNoRows)
 
@@ -666,6 +670,8 @@ func TestSignForInvalidSignTimestamp(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "auth_id", id)
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
+	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
+
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
 	mockDb.EXPECT().ProfileById(id).Return(nil, db.ErrNoRows)
 	mockDb.EXPECT().ProfileByPhoneNumber(rq.Value).Return(nil, db.ErrNoRows)
@@ -729,6 +735,7 @@ func TestSignWithExistUserForAddress(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "auth_id", id)
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
+	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
 
 	profile := &db.Profile{
