@@ -27,6 +27,7 @@ type DB interface {
 	ProfileByPhoneNumber(phoneNumber string) (*Profile, error)
 	ProfileByEmail(email string) (*Profile, error)
 	ProfilesCount() (int, error)
+	GetMessagesByReceiver(id string, afterTimestamp int64) ([]Message, error)
 
 	CreateProfile(ctx context.Context, profile *Profile, addresses []*Address) error
 	IdByToken(token string) (string, error)

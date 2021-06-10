@@ -15,6 +15,7 @@ type Profile struct {
 	IsMigratory bool `pg:",use_zero"`
 	AvatarExt   string
 	LastUpdate  int64 `pg:",use_zero"`
+	IsChatBot   bool
 }
 
 func (db *PgDB) ProfileByMatchedPhoneNumber(contactPhoneNumber string, myPhoneNumber string) (*Profile, error) {

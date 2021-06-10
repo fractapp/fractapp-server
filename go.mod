@@ -19,6 +19,7 @@ require (
 	github.com/go-pg/migrations/v8 v8.0.1
 	github.com/go-pg/pg/v10 v10.7.3
 	github.com/golang/mock v1.4.4
+	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/lestrrat-go/jwx v1.0.6-0.20201127121120-26218808f029
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/rs/zerolog v1.20.0 // indirect
