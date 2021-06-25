@@ -16,3 +16,11 @@ htmlCoverage:
 updateSwagger:
 	${GOPATH}/bin/swag init -g cmd/api/main.go
 
+migrationInit:
+	go run ./migrations/*.go --config $(CONFIG) init
+
+migrationUp:
+	go run ./migrations/*.go --config $(CONFIG) up
+
+migrationDown:
+	go run ./migrations/*.go --config $(CONFIG) down

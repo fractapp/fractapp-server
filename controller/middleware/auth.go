@@ -67,7 +67,7 @@ func (a *AuthMiddleware) PubKeyAuth(next http.Handler) http.Handler {
 }
 func (a *AuthMiddleware) JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := a.authWithJwt(r)
+		id, err := a.AuthWithJwt(r, jwtauth.TokenFromHeader)
 		if err == InvalidAuthErr {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -117,19 +117,16 @@ func (a *AuthMiddleware) authWithPubKey(r *http.Request) (string, error) {
 	hash := sha256.Sum256(pubKey[:])
 	return hexutil.Encode(hash[:])[2:], nil
 }
-func (a *AuthMiddleware) authWithJwt(r *http.Request) (string, error) {
+func (a *AuthMiddleware) AuthWithJwt(r *http.Request, findTokenFns func(r *http.Request) string) (string, error) {
 	token, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		return "", err
 	}
-
-	tokenString := jwtauth.TokenFromHeader(r)
-
 	if token == nil || jwt.Validate(token) != nil {
 		return "", InvalidAuthErr
 	}
 
-	id, err := a.db.IdByToken(tokenString)
+	id, err := a.db.IdByToken(findTokenFns(r))
 	if err != nil {
 		return "", InvalidAuthErr
 	}

@@ -225,7 +225,7 @@ func (c *Controller) userInfo(w http.ResponseWriter, r *http.Request) error {
 
 	var p *db.Profile
 	var err error
-	if id != "" {
+	if id != "" && len(id) == 64 {
 		p, err = c.db.ProfileById(id)
 	} else {
 		return errors.New("invalid params")
