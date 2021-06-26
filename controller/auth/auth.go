@@ -217,14 +217,16 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	rq.Value = c.notificator[rq.Type].Format(rq.Value)
-	if err := c.notificator[rq.Type].Validate(rq.Value); err != nil {
-		return err
-	}
+	if rq.Type != notification.CryptoAddress {
+		rq.Value = c.notificator[rq.Type].Format(rq.Value)
+		if err := c.notificator[rq.Type].Validate(rq.Value); err != nil {
+			return err
+		}
 
-	//check confirm code
-	if err := c.confirm(rq.Value, rq.Type, notification.Auth, rq.Code); err != nil {
-		return err
+		//check confirm code
+		if err := c.confirm(rq.Value, rq.Type, notification.Auth, rq.Code); err != nil {
+			return err
+		}
 	}
 
 	id := middleware.AuthId(r)
@@ -239,6 +241,8 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		existProfile, err = c.db.ProfileByEmail(rq.Value)
 	case notification.SMS:
 		existProfile, err = c.db.ProfileByPhoneNumber(rq.Value)
+	case notification.CryptoAddress:
+		existProfile, err = c.db.ProfileById(id)
 	}
 
 	if err != nil && err != db.ErrNoRows {
@@ -273,6 +277,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 			profile.Email = rq.Value
 		case notification.SMS:
 			profile.PhoneNumber = rq.Value
+		case notification.CryptoAddress:
 		}
 		err = c.db.UpdateByPK(profile)
 		if err != nil {
@@ -311,6 +316,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 			profile.Email = rq.Value
 		case notification.SMS:
 			profile.PhoneNumber = rq.Value
+		case notification.CryptoAddress:
 		}
 
 		if err := c.db.CreateProfile(r.Context(), profile, addresses); err != nil {

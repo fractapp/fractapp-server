@@ -3,11 +3,12 @@ package websocket
 import "fractapp-server/controller/profile"
 
 const (
-	Messages Method = "messages"
-	Send     Method = "send"
+	Messages    Method = "messages"
+	AddTxToChat Action = "addTxToChat"
 )
 
 type Method string
+type Action string
 
 type Request struct {
 	Id        int64      `json:"id"`

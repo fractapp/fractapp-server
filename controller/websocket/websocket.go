@@ -3,13 +3,18 @@ package websocket
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/controller/middleware"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
 	"fractapp-server/types"
 	"fractapp-server/utils"
+	"io/ioutil"
+	"math/big"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,10 +105,9 @@ func connect(jwtAuth *jwtauth.JWTAuth, authMiddleware *middleware.AuthMiddleware
 		}
 
 		switch rq.Method {
-		case Send:
-			err = writeMsg(id, rq.Message, pgDB)
 		case Messages:
-			var dbMsgs []db.Message //TODO: my messages for history and is_delivered
+			err = writeMsg(id, rq.Message, pgDB)
+			/*var dbMsgs []db.Message //TODO: my messages for history and is_delivered
 			dbMsgs, err = pgDB.MessagesByReceiver(id)
 			if err != nil {
 				break
@@ -132,7 +136,7 @@ func connect(jwtAuth *jwtauth.JWTAuth, authMiddleware *middleware.AuthMiddleware
 			response.Value = &MessagesAndUsersRs{
 				Messages: messages,
 				Users:    users,
-			}
+			}*/
 		}
 
 		if err == nil {
@@ -224,6 +228,134 @@ func writeMsg(sender string, msg *MessageRq, pgDB db.DB) error {
 		return err
 	}
 
+	if strings.HasPrefix(msg.Value, "/") {
+
+		switch Action(msg.Value[1:]) {
+		case AddTxToChat:
+
+		}
+		address := r.URL.Query().Get("address")
+		currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
+		if err != nil {
+			return err
+		}
+		currency := types.Currency(currencyInt)
+
+		resp, err := http.Get(fmt.Sprintf("%s/transactions/%s?currency=%s", c.txApiHost, address, currency.String()))
+		if err != nil {
+			return InvalidConnectionTxApiErr
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return InvalidConnectionTxApiErr
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		txs := make([]types.Transaction, 0)
+		err = json.Unmarshal(body, &txs)
+		if err != nil {
+			return err
+		}
+
+		responseTxs := make([]Transaction, 0)
+		for _, v := range txs {
+			txTime := time.Unix(v.Timestamp/1000, 0)
+			prices, err := c.db.Prices(currency.String(), txTime.
+				Add(-15*time.Minute).Unix()*1000, txTime.
+				Add(15*time.Minute).Unix()*1000)
+
+			if err != nil {
+				return err
+			}
+
+			price := float32(0)
+			// search for a value with a minimum difference from the transaction time
+			if len(prices) > 0 {
+				price = prices[0].Price
+				diff := v.Timestamp - prices[0].Timestamp
+				for _, p := range prices {
+					newDiff := v.Timestamp - p.Timestamp
+					if newDiff < 0 {
+						newDiff *= -1
+					}
+
+					if newDiff < diff {
+						diff = newDiff
+						price = p.Price
+					}
+				}
+			}
+
+			value, _ := new(big.Int).SetString(v.Value, 10)
+			fee, _ := new(big.Int).SetString(v.Fee, 10)
+
+			floatValue := currency.ConvertFromPlanck(value)
+			floatFee := currency.ConvertFromPlanck(fee)
+
+			a := currency.Accuracy()
+			aBig := new(big.Float).SetInt(big.NewInt(a))
+
+			fv, _ := new(big.Float).Mul(floatValue, aBig).Float32()
+			fv /= float32(a)
+			usdValue := price * fv
+
+			ff, _ := new(big.Float).Mul(floatFee, aBig).Float32()
+			ff /= float32(a)
+			usdFee := price * ff
+
+			userFrom := ""
+			p, err := c.db.ProfileByAddress(v.From)
+			if err != nil && err != db.ErrNoRows {
+				return err
+			}
+			if p != nil {
+				userFrom = p.Id
+			}
+
+			userTo := ""
+			p, err = c.db.ProfileByAddress(v.To)
+			if err != nil && err != db.ErrNoRows {
+				return err
+			}
+			if p != nil {
+				userTo = p.Id
+			}
+
+			responseTxs = append(responseTxs, Transaction{
+				ID:   v.ID,
+				Hash: v.Hash,
+
+				Currency: v.Currency,
+
+				From:     v.From,
+				UserFrom: userFrom,
+
+				To:     v.To,
+				UserTo: userTo,
+
+				Value:      v.Value,
+				UsdValue:   usdValue,
+				FloatValue: floatValue.String(),
+
+				Fee:       v.Fee,
+				UsdFee:    usdFee,
+				FloatFee:  floatFee.String(),
+				Timestamp: v.Timestamp,
+				Status:    v.Status,
+			})
+		}
+
+		rsByte, err := json.Marshal(responseTxs)
+		if err != nil {
+			return err
+		}
+	}
+
 	msgs, err := pgDB.MessagesBySenderAndReceiver(dbMessage.SenderId, dbMessage.ReceiverId)
 	if err != nil {
 		return err
@@ -251,7 +383,7 @@ func writeMsg(sender string, msg *MessageRq, pgDB db.DB) error {
 	}
 
 	err = sendWsData(Response{
-		Method: Send,
+		Method: Messages,
 		Value: &MessagesAndUsersRs{
 			Messages: messages,
 			Users:    users,
