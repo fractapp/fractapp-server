@@ -13,7 +13,6 @@ import (
 	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,26 +23,27 @@ import (
 )
 
 const (
-	UpdateProfileRoute     = "/updateProfile"
-	UsernameRoute          = "/username"
-	UploadAvatarRoute      = "/uploadAvatar"
-	MyProfileRoute         = "/my"
-	SearchRoute            = "/search"
-	MyContactsRoute        = "/contacts"
-	UploadContactsRoute    = "/uploadContacts"
-	MyMatchContactsRoute   = "/matchContacts"
-	UserInfoRoute          = "/userInfo"
-	AvatarRoute            = "/avatar"
-	TransactionsRoute      = "/transactions"
-	SubstrateBalanceRoute  = "/substrate/balance"
-	TransactionStatusRoute = "/transaction/status"
+	UpdateProfileRoute       = "/updateProfile"
+	UsernameRoute            = "/username"
+	UploadAvatarRoute        = "/uploadAvatar"
+	MyProfileRoute           = "/my"
+	SearchRoute              = "/search"
+	MyContactsRoute          = "/contacts"
+	UploadContactsRoute      = "/uploadContacts"
+	MyMatchContactsRoute     = "/matchContacts"
+	UserInfoRoute            = "/userInfo"
+	AvatarRoute              = "/avatar"
+	SubstrateBalanceRoute    = "/substrate/balance"
+	TransactionStatusRoute   = "/transaction/status"
+	UpdateFirebaseTokenRoute = "/firebase"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
 	MaxUsersResult  = 10
 	MinSearchLength = 4
 
-	MaxContacts = 400
+	MaxContacts          = 400
+	MaxAddressesForToken = 10
 )
 
 var (
@@ -54,6 +54,7 @@ var (
 	InvalidPropertyErr        = errors.New("property has invalid symbols or length")
 	AvatarNotFoundErr         = errors.New("avatar not found")
 	InvalidConnectionTxApiErr = errors.New("invalid connection to transaction API")
+	MaxAddressCountByTokenErr = errors.New("token limit for addresses exceeded")
 )
 
 type Controller struct {
@@ -93,12 +94,12 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.userInfo, nil
 	case AvatarRoute:
 		return c.avatar, nil
-	case TransactionsRoute:
-		return c.transactions, nil
 	case SubstrateBalanceRoute:
 		return c.substrateBalance, nil
 	case TransactionStatusRoute:
 		return c.transactionStatus, nil
+	case UpdateFirebaseTokenRoute:
+		return c.updateFirebaseToken, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -179,22 +180,17 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	for _, v := range profiles {
-		addresses, err := c.db.AddressesById(v.Id)
-		if err != nil {
-			continue
-		}
-
 		user := ShortUserProfile{
-			Id:         v.Id,
+			Id:         v.AuthId,
 			Name:       v.Name,
 			Username:   v.Username,
 			AvatarExt:  v.AvatarExt,
 			LastUpdate: v.LastUpdate,
-			Addresses:  make(map[types.Currency]string),
+			Addresses:  make(map[types.Network]string),
 		}
 
-		for _, v := range addresses {
-			user.Addresses[v.Network.Currency()] = v.Address
+		for k, v := range v.Addresses {
+			user.Addresses[k] = v.Address
 		}
 
 		users = append(users, user)
@@ -226,7 +222,7 @@ func (c *Controller) userInfo(w http.ResponseWriter, r *http.Request) error {
 	var p *db.Profile
 	var err error
 	if id != "" && len(id) == 64 {
-		p, err = c.db.ProfileById(id)
+		p, err = c.db.ProfileByAuthId(id)
 	} else {
 		return errors.New("invalid params")
 	}
@@ -234,22 +230,17 @@ func (c *Controller) userInfo(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	addresses, err := c.db.AddressesById(p.Id)
-	if err != nil {
-		return err
-	}
-
 	user := ShortUserProfile{
-		Id:         p.Id,
+		Id:         p.AuthId,
 		Name:       p.Name,
 		Username:   p.Username,
 		AvatarExt:  p.AvatarExt,
 		LastUpdate: p.LastUpdate,
-		Addresses:  make(map[types.Currency]string),
+		Addresses:  make(map[types.Network]string),
 	}
 
-	for _, v := range addresses {
-		user.Addresses[v.Network.Currency()] = v.Address
+	for k, v := range p.Addresses {
+		user.Addresses[k] = v.Address
 	}
 
 	b, err := json.Marshal(&user)
@@ -274,13 +265,13 @@ func (c *Controller) userInfo(w http.ResponseWriter, r *http.Request) error {
 func (c *Controller) myProfile(w http.ResponseWriter, r *http.Request) error {
 	id := middleware.AuthId(r)
 
-	profile, err := c.db.ProfileById(id)
+	profile, err := c.db.ProfileByAuthId(id)
 	if err != nil {
 		return err
 	}
 
 	myProfile := &MyProfile{
-		Id:          profile.Id,
+		Id:          profile.AuthId,
 		Name:        profile.Name,
 		Username:    profile.Username,
 		PhoneNumber: profile.PhoneNumber,
@@ -321,7 +312,7 @@ func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error
 
 	id := middleware.AuthId(r)
 
-	profile, err := c.db.ProfileById(id)
+	profile, err := c.db.ProfileByAuthId(id)
 	if err != nil {
 		return err
 	}
@@ -355,7 +346,7 @@ func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) error
 
 	profile.LastUpdate = sec
 
-	err = c.db.UpdateByPK(profile)
+	err = c.db.UpdateByPK(profile.Id, profile)
 	if err != nil {
 		return err
 	}
@@ -377,7 +368,7 @@ func (c *Controller) avatar(w http.ResponseWriter, r *http.Request) error {
 	u, _ := url.Parse(r.URL.Path)
 	userId := path.Base(u.Path)
 
-	var p, err = c.db.ProfileById(userId)
+	var p, err = c.db.ProfileByAuthId(userId)
 	if err != nil {
 		return AvatarNotFoundErr
 	}
@@ -449,14 +440,14 @@ func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error 
 
 	now := time.Now()
 
-	profile, err := c.db.ProfileById(id)
+	profile, err := c.db.ProfileByAuthId(id)
 	if err != nil {
 		return err
 	}
 
 	profile.AvatarExt = ex[1]
 	profile.LastUpdate = now.Unix()
-	err = c.db.UpdateByPK(profile)
+	err = c.db.UpdateByPK(profile.Id, profile)
 	if err != nil {
 		return err
 	}
@@ -475,9 +466,9 @@ func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) error 
 // @Failure 400 {string} string
 // @Router /profile/contacts [get]
 func (c *Controller) myContacts(w http.ResponseWriter, r *http.Request) error {
-	id := middleware.AuthId(r)
+	profileId := middleware.ProfileId(r)
 
-	existContacts, err := c.db.AllContacts(id)
+	existContacts, err := c.db.AllContacts(profileId)
 	if err != nil {
 		return err
 	}
@@ -511,35 +502,26 @@ func (c *Controller) myContacts(w http.ResponseWriter, r *http.Request) error {
 // @Failure 400 {string} string
 // @Router /profile/matchContacts [get]
 func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) error {
-	id := middleware.AuthId(r)
-	p, err := c.db.ProfileById(id)
-	if err != nil {
-		return err
-	}
+	profileId := middleware.ProfileId(r)
 
-	matchContacts, err := c.db.AllMatchContacts(p.Id, p.PhoneNumber)
+	matchContacts, err := c.db.AllMatchContacts(profileId)
 	if err != nil {
 		return err
 	}
 
 	var users []ShortUserProfile
 	for _, v := range matchContacts {
-		addresses, err := c.db.AddressesById(v.Id)
-		if err != nil {
-			continue
-		}
-
 		user := ShortUserProfile{
-			Id:         v.Id,
+			Id:         v.AuthId,
 			Name:       v.Name,
 			Username:   v.Username,
 			AvatarExt:  v.AvatarExt,
 			LastUpdate: v.LastUpdate,
-			Addresses:  make(map[types.Currency]string),
+			Addresses:  make(map[types.Network]string),
 		}
 
-		for _, v := range addresses {
-			user.Addresses[v.Network.Currency()] = v.Address
+		for k, v := range v.Addresses {
+			user.Addresses[k] = v.Address
 		}
 
 		users = append(users, user)
@@ -575,7 +557,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 
-	id := middleware.AuthId(r)
+	profileId := middleware.ProfileId(r)
 
 	var contacts []string
 	err = json.Unmarshal(b, &contacts)
@@ -587,7 +569,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 		contacts = contacts[0:MaxContacts]
 	}
 
-	existContacts, err := c.db.AllContacts(id)
+	existContacts, err := c.db.AllContacts(profileId)
 	if err != nil && err != db.ErrNoRows {
 		return err
 	}
@@ -607,7 +589,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 		}
 
 		myContacts = append(myContacts, db.Contact{
-			Id:          id,
+			ProfileId:   profileId,
 			PhoneNumber: v,
 		})
 	}
@@ -622,7 +604,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
-// username godoc
+// findUsername godoc
 // @Summary Is username exist?
 // @ID username
 // @Tags Profile
@@ -649,7 +631,7 @@ func (c *Controller) usernameIsExist(username string) (bool, error) {
 		return false, InvalidPropertyErr
 	}
 
-	isExist, err := c.db.UsernameIsExist(username)
+	isExist, err := c.db.IsUsernameExist(username)
 	if err != nil {
 		return false, err
 	}
@@ -657,147 +639,7 @@ func (c *Controller) usernameIsExist(username string) (bool, error) {
 	return isExist, nil
 }
 
-// username godoc
-// @Summary Get transactions by address
-// @ID getTransactions
-// @Tags Profile
-// @Accept  json
-// @Produce json
-// @Param address query string true "address"
-// @Param currency query int true "currency"
-// @Success 200 {object} Transaction
-// @Failure 400 {string} string
-// @Router /profile/transactions [get]
-func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error {
-	address := r.URL.Query().Get("address")
-	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
-	if err != nil {
-		return err
-	}
-	currency := types.Currency(currencyInt)
-
-	resp, err := http.Get(fmt.Sprintf("%s/transactions/%s?currency=%s", c.txApiHost, address, currency.String()))
-	if err != nil {
-		return InvalidConnectionTxApiErr
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return InvalidConnectionTxApiErr
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	txs := make([]types.Transaction, 0)
-	err = json.Unmarshal(body, &txs)
-	if err != nil {
-		return err
-	}
-
-	responseTxs := make([]Transaction, 0)
-	for _, v := range txs {
-		txTime := time.Unix(v.Timestamp/1000, 0)
-		prices, err := c.db.Prices(currency.String(), txTime.
-			Add(-15*time.Minute).Unix()*1000, txTime.
-			Add(15*time.Minute).Unix()*1000)
-
-		if err != nil {
-			return err
-		}
-
-		price := float32(0)
-		// search for a value with a minimum difference from the transaction time
-		if len(prices) > 0 {
-			price = prices[0].Price
-			diff := v.Timestamp - prices[0].Timestamp
-			for _, p := range prices {
-				newDiff := v.Timestamp - p.Timestamp
-				if newDiff < 0 {
-					newDiff *= -1
-				}
-
-				if newDiff < diff {
-					diff = newDiff
-					price = p.Price
-				}
-			}
-		}
-
-		value, _ := new(big.Int).SetString(v.Value, 10)
-		fee, _ := new(big.Int).SetString(v.Fee, 10)
-
-		floatValue := currency.ConvertFromPlanck(value)
-		floatFee := currency.ConvertFromPlanck(fee)
-
-		a := currency.Accuracy()
-		aBig := new(big.Float).SetInt(big.NewInt(a))
-
-		fv, _ := new(big.Float).Mul(floatValue, aBig).Float32()
-		fv /= float32(a)
-		usdValue := price * fv
-
-		ff, _ := new(big.Float).Mul(floatFee, aBig).Float32()
-		ff /= float32(a)
-		usdFee := price * ff
-
-		userFrom := ""
-		p, err := c.db.ProfileByAddress(v.From)
-		if err != nil && err != db.ErrNoRows {
-			return err
-		}
-		if p != nil {
-			userFrom = p.Id
-		}
-
-		userTo := ""
-		p, err = c.db.ProfileByAddress(v.To)
-		if err != nil && err != db.ErrNoRows {
-			return err
-		}
-		if p != nil {
-			userTo = p.Id
-		}
-
-		responseTxs = append(responseTxs, Transaction{
-			ID:   v.ID,
-			Hash: v.Hash,
-
-			Currency: v.Currency,
-
-			From:     v.From,
-			UserFrom: userFrom,
-
-			To:     v.To,
-			UserTo: userTo,
-
-			Value:      v.Value,
-			UsdValue:   usdValue,
-			FloatValue: floatValue.String(),
-
-			Fee:       v.Fee,
-			UsdFee:    usdFee,
-			FloatFee:  floatFee.String(),
-			Timestamp: v.Timestamp,
-			Status:    v.Status,
-		})
-	}
-
-	rsByte, err := json.Marshal(responseTxs)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(rsByte)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// username godoc
+// transactionStatus godoc
 // @Summary Get tx status
 // @ID getTxStatus
 // @Tags Profile
@@ -843,7 +685,7 @@ func (c *Controller) transactionStatus(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
-// username godoc
+// substrateBalance godoc
 // @Summary Get substrateBalance by address
 // @ID getBalance
 // @Tags Profile
@@ -892,5 +734,71 @@ func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) er
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// updateFirebaseToken godoc
+// @Summary Subscribe
+// @Description subscribe for notifications about transaction
+// @ID subscribe
+// @Tags Notification
+// @Accept  json
+// @Produce json
+// @Param rq body UpdateTokenRq true "update token request"
+// @Success 200
+// @Failure 400 {string} string
+// @Router /notification/subscribe [post]
+func (c *Controller) updateFirebaseToken(w http.ResponseWriter, r *http.Request) error {
+	profileId := middleware.ProfileId(r)
+
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Rq body: %s\n", string(b))
+
+	updateTokenRq := UpdateFirebaseTokenRq{}
+	err = json.Unmarshal(b, &updateTokenRq)
+	if err != nil {
+		return err
+	}
+
+	subsCountByToken, err := c.db.SubscribersCountByToken(updateTokenRq.Token)
+	if err != nil && err != db.ErrNoRows {
+		return err
+	}
+
+	if subsCountByToken >= MaxAddressesForToken {
+		return MaxAddressCountByTokenErr
+	}
+
+	sub, err := c.db.SubscriberByProfileId(profileId)
+	if err != nil && err != db.ErrNoRows {
+		return err
+	}
+
+	if err == db.ErrNoRows {
+		sub = &db.Subscriber{
+			Token:     updateTokenRq.Token,
+			ProfileId: profileId,
+			Timestamp: time.Now().Unix(),
+		}
+	} else {
+		sub.Token = updateTokenRq.Token
+	}
+
+	if err == db.ErrNoRows {
+		err = c.db.Insert(sub)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = c.db.UpdateByPK(sub.Id, sub)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

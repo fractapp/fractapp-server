@@ -6,14 +6,14 @@ import (
 )
 
 type Config struct {
-	TransactionApi string
-	SubstrateUrls  map[string]string
-	BinanceApi     string
-	SMSService     SMSService
-	Firebase       Firebase
-	DB             DB
-	Secret         string
-	SMTP           `json:"SMTP"`
+	TransactionApi     string
+	SubstrateUrls      map[string]string
+	BinanceApi         string
+	SMSService         SMSService
+	Firebase           Firebase
+	DBConnectionString string
+	Secret             string
+	SMTP               `json:"SMTP"`
 }
 
 type SMTP struct {
@@ -33,12 +33,6 @@ type SMSService struct {
 }
 type Firebase struct {
 	ProjectId string
-}
-type DB struct {
-	Host     string
-	User     string
-	Password string
-	Database string
 }
 
 func Parse(path string) (*Config, error) {

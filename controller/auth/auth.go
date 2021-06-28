@@ -135,7 +135,7 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	auth, err := c.db.AuthByValue(rq.Value, rq.Type, rq.CheckType)
+	auth, err := c.db.AuthByValue(rq.Value, rq.Type)
 	if err != nil && err != pg.ErrNoRows {
 		return err
 	}
@@ -162,7 +162,6 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 
 	code := generateCode()
 
-	auth.CheckType = rq.CheckType
 	auth.Code = code
 	auth.Timestamp = now.Unix()
 	auth.Count++
@@ -172,7 +171,7 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	if err == pg.ErrNoRows {
 		err = c.db.Insert(auth)
 	} else {
-		err = c.db.UpdateByPK(auth)
+		err = c.db.UpdateByPK(auth.Id, auth)
 	}
 
 	if err != nil {
@@ -224,13 +223,13 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		//check confirm code
-		if err := c.confirm(rq.Value, rq.Type, notification.Auth, rq.Code); err != nil {
+		if err := c.confirm(rq.Value, rq.Type, rq.Code); err != nil {
 			return err
 		}
 	}
 
 	id := middleware.AuthId(r)
-	profile, err := c.db.ProfileById(id)
+	profile, err := c.db.ProfileByAuthId(id)
 	if err != nil && err != pg.ErrNoRows {
 		return err
 	}
@@ -242,13 +241,13 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	case notification.SMS:
 		existProfile, err = c.db.ProfileByPhoneNumber(rq.Value)
 	case notification.CryptoAddress:
-		existProfile, err = c.db.ProfileById(id)
+		existProfile, err = c.db.ProfileByAuthId(id)
 	}
 
 	if err != nil && err != db.ErrNoRows {
 		return err
 	}
-	if err != db.ErrNoRows && existProfile != nil && existProfile.Id != id {
+	if err != db.ErrNoRows && existProfile != nil && existProfile.AuthId != id {
 		return AccountExistErr
 	}
 
@@ -279,18 +278,16 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 			profile.PhoneNumber = rq.Value
 		case notification.CryptoAddress:
 		}
-		err = c.db.UpdateByPK(profile)
+		err = c.db.UpdateByPK(profile.Id, profile)
 		if err != nil {
 			return err
 		}
 	} else {
-		var addresses []*db.Address
+		addresses := make(map[types.Network]db.Address)
 		for network, v := range rq.Addresses {
-			addresses = append(addresses, &db.Address{
-				Id:      id,
+			addresses[network] = db.Address{
 				Address: v.Address,
-				Network: network,
-			})
+			}
 		}
 
 		//Generate username
@@ -306,7 +303,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		username = fmt.Sprintf("%s%d", validators.UsernamePrefix, total)
 
 		profile = &db.Profile{
-			Id:          id,
+			AuthId:      id,
 			IsMigratory: false,
 			Username:    username,
 		}
@@ -319,7 +316,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		case notification.CryptoAddress:
 		}
 
-		if err := c.db.CreateProfile(r.Context(), profile, addresses); err != nil {
+		if err := c.db.Insert(profile); err != nil {
 			return err
 		}
 	}
@@ -329,18 +326,19 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	token := &TokenRs{Token: tokenString}
-	rsByte, err := json.Marshal(token)
+	dbToken, err := c.db.TokenByProfileId(profile.Id)
+	if err == db.ErrNoRows {
+		err = c.db.Insert(&db.Token{Token: tokenString, ProfileId: profile.Id})
+	} else {
+		dbToken.Token = tokenString
+		err = c.db.UpdateByPK(dbToken.Id, dbToken)
+	}
 	if err != nil {
 		return err
 	}
 
-	_, err = c.db.TokenById(id)
-	if err == db.ErrNoRows {
-		err = c.db.Insert(&db.Token{Token: tokenString, Id: id})
-	} else {
-		err = c.db.UpdateByPK(&db.Token{Token: tokenString, Id: id})
-	}
+	tokenRs := &TokenRs{Token: tokenString}
+	rsByte, err := json.Marshal(tokenRs)
 	if err != nil {
 		return err
 	}
@@ -353,8 +351,8 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (c *Controller) confirm(value string, codeType notification.NotificatorType, checkType notification.CheckType, code string) error {
-	auth, err := c.db.AuthByValue(value, codeType, checkType)
+func (c *Controller) confirm(value string, codeType notification.NotificatorType, code string) error {
+	auth, err := c.db.AuthByValue(value, codeType)
 	if err != nil {
 		return err
 	}
@@ -374,7 +372,7 @@ func (c *Controller) confirm(value string, codeType notification.NotificatorType
 	if auth.Code != code {
 		auth.Attempts++
 
-		if err := c.db.UpdateByPK(auth); err != nil {
+		if err := c.db.UpdateByPK(auth.Id, auth); err != nil {
 			return err
 		}
 
@@ -382,7 +380,7 @@ func (c *Controller) confirm(value string, codeType notification.NotificatorType
 	}
 	auth.IsValid = false
 
-	c.db.UpdateByPK(auth)
+	c.db.UpdateByPK(auth.Id, auth)
 
 	return nil
 }
@@ -415,23 +413,31 @@ func (c *Controller) checkAddresses(rq *ConfirmAuthRq, authPubKey string, rqTime
 			continue
 		}
 
-		addressExist, err := c.db.AddressIsExist(v.Address)
-		if err != nil {
+		isAddressExist := true
+		_, err = c.db.ProfileByAddress(network, v.Address)
+		if err != db.ErrNoRows && err != nil {
 			return err
 		}
 
-		if addressExist {
+		if err == db.ErrNoRows {
+			isAddressExist = false
+		} else {
+			isAddressExist = true
+		}
+
+		if isAddressExist {
 			return AddressExistErr
 		}
 	}
 
 	if profile != nil {
-		addresses, err := c.db.AddressesById(profile.Id)
+		pDb, err := c.db.ProfileByAuthId(profile.AuthId)
 		if err != nil {
 			return err
 		}
-		for _, v := range addresses {
-			if rq.Addresses[v.Network].Address != v.Address {
+
+		for k, v := range pDb.Addresses {
+			if rq.Addresses[k].Address != v.Address {
 				return AccountExistErr
 			}
 		}

@@ -17,12 +17,12 @@ type MyProfile struct {
 	LastUpdate  int64  `json:"lastUpdate"`  // timestamp of the last userInfo update
 }
 type ShortUserProfile struct {
-	Id         string                    `json:"id"` // id from userInfo
-	Name       string                    `json:"name"`
-	Username   string                    `json:"username"`
-	AvatarExt  string                    `json:"avatarExt"`  // avatar format (png/jpg/jpeg)
-	LastUpdate int64                     `json:"lastUpdate"` // timestamp of the last userInfo update
-	Addresses  map[types.Currency]string `json:"addresses"`  // String addresses by network (0 - polkadot/ 1 - kusama) from account
+	Id         string                   `json:"id"` // id from userInfo
+	Name       string                   `json:"name"`
+	Username   string                   `json:"username"`
+	AvatarExt  string                   `json:"avatarExt"`  // avatar format (png/jpg/jpeg)
+	LastUpdate int64                    `json:"lastUpdate"` // timestamp of the last userInfo update
+	Addresses  map[types.Network]string `json:"addresses"`  // String addresses by network (0 - polkadot/ 1 - kusama) from account
 }
 
 type Transaction struct {
@@ -58,3 +58,7 @@ type Balance struct {
 }
 
 type MyContacts map[string]ShortUserProfile // map with id->short user userInfo
+
+type UpdateFirebaseTokenRq struct {
+	Token string
+}

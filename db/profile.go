@@ -1,131 +1,159 @@
 package db
 
 import (
-	"context"
+	"fractapp-server/types"
+	"strconv"
 
-	"github.com/go-pg/pg/v10"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Profile struct {
-	Id          string `pg:",pk"`
-	Name        string
-	Username    string
-	PhoneNumber string `pg:"phone_number"`
-	Email       string
-	IsMigratory bool `pg:",use_zero"`
-	AvatarExt   string
-	LastUpdate  int64 `pg:",use_zero"`
-	IsChatBot   bool  `pg:",use_zero"`
+	Id          ID                        `bson:"_id"`
+	AuthId      string                    `bson:"auth_id"`
+	Name        string                    `bson:"name"`
+	Username    string                    `bson:"username"`
+	PhoneNumber string                    `bson:"phone_number"`
+	Email       string                    `bson:"email"`
+	IsMigratory bool                      `bson:"is_migratory"`
+	AvatarExt   string                    `bson:"avatar_ext"`
+	LastUpdate  int64                     `bson:"last_update"`
+	IsChatBot   bool                      `bson:"is_chat_bot"`
+	Addresses   map[types.Network]Address `bson:"addresses"`
 }
 
-func (db *PgDB) ProfileByMatchedPhoneNumber(contactPhoneNumber string, myPhoneNumber string) (*Profile, error) {
+type Address struct {
+	Address string `bson:"address"`
+}
+
+func (db *MongoDB) profileBy(property string, value interface{}) (*Profile, error) {
 	p := &Profile{}
-	if err := db.Model(p).Where("phone_number = ?", contactPhoneNumber).Select(); err != nil {
-		return nil, err
-	}
 
-	c := &Contact{}
-	if err := db.Model(&c).Where("id = ?", p.Id).Where("phone_number = ?", myPhoneNumber).Select(); err != nil {
-		return nil, err
-	}
-
-	return p, nil
-}
-
-func (db *PgDB) SearchUsersByUsername(value string, limit int) ([]Profile, error) {
-	var p []Profile
-	err := db.Model(&p).Where("username LIKE ?", value+"%").Order("username ASC").Limit(limit).Select()
+	collection := db.collections[ProfilesDB]
+	res, err := collection.Find(db.ctx, bson.D{
+		{property, value},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	err = res.Decode(p)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, err
 }
-func (db *PgDB) SearchUsersByEmail(value string) (*Profile, error) {
+
+func (db *MongoDB) SearchUsersByUsername(value string, limit int64) ([]Profile, error) {
+	var profiles []Profile
+
+	opt := options.Find()
+	opt.SetLimit(limit)
+
+	collection := db.collections[ProfilesDB]
+	res, err := collection.Find(db.ctx, bson.D{
+		{"username", primitive.Regex{Pattern: "/^" + value}},
+	}, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Decode(profiles)
+	if err != nil {
+		return nil, err
+	}
+
+	return profiles, err
+}
+func (db *MongoDB) SearchUsersByEmail(email string) (*Profile, error) {
 	p := &Profile{}
-	err := db.Model(p).Where("lower(email) = ?", value).Select()
+
+	collection := db.collections[ProfilesDB]
+	res, err := collection.Find(db.ctx, bson.D{
+		{"email", email},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
-}
-
-func (db *PgDB) ProfileById(id string) (*Profile, error) {
-	p := &Profile{}
-	err := db.Model(p).Where("id = ?", id).Select()
+	err = res.Decode(p)
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	return p, err
 }
-func (db *PgDB) ProfileByUsername(username string) (*Profile, error) {
-	p := &Profile{}
-	err := db.Model(p).Where("username = ?", username).Select()
+
+func (db *MongoDB) ProfileById(id ID) (*Profile, error) {
+	p, err := db.profileBy("_id", id)
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	return p, err
 }
-func (db *PgDB) ProfileByAddress(address string) (*Profile, error) {
-	a := &Address{}
-	err := db.Model(a).Where("address = ?", address).Select()
+func (db *MongoDB) ProfileByAuthId(authId string) (*Profile, error) {
+	p, err := db.profileBy("auth_id", authId)
 	if err != nil {
 		return nil, err
 	}
 
-	p := &Profile{}
-	err = db.Model(p).Where("id = ?", a.Id).Select()
+	return p, err
+}
+func (db *MongoDB) ProfileByUsername(username string) (*Profile, error) {
+	p, err := db.profileBy("username", username)
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	return p, err
 }
-func (db *PgDB) ProfileByPhoneNumber(phoneNumber string) (*Profile, error) {
-	p := &Profile{}
-	err := db.Model(p).Where("phone_number = ?", phoneNumber).Select()
+func (db *MongoDB) ProfileByAddress(network types.Network, address string) (*Profile, error) {
+	p, err := db.profileBy("addresses."+strconv.FormatInt(int64(network), 10), address)
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	return p, err
 }
-func (db *PgDB) ProfileByEmail(email string) (*Profile, error) {
-	p := &Profile{}
-	err := db.Model(p).Where("email = ?", email).Select()
+func (db *MongoDB) ProfileByPhoneNumber(phoneNumber string) (*Profile, error) {
+	p, err := db.profileBy("phone_number", phoneNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	return p, err
 }
-func (db *PgDB) UsernameIsExist(username string) (bool, error) {
-	return db.Model(&Profile{}).Where("username = ?", username).Exists()
-}
-
-func (db *PgDB) CreateProfile(ctx context.Context, profile *Profile, addresses []*Address) error {
-	if err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
-		if _, err := tx.Model(profile).Insert(); err != nil {
-			return err
-		}
-
-		for _, v := range addresses {
-			if _, err := tx.Model(v).Insert(); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}); err != nil {
-		return err
+func (db *MongoDB) ProfileByEmail(email string) (*Profile, error) {
+	p, err := db.profileBy("email", email)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return p, err
+}
+func (db *MongoDB) IsUsernameExist(username string) (bool, error) {
+	_, err := db.profileBy("username", username)
+	if err != ErrNoRows && err != nil {
+		return false, err
+	}
+
+	if err != ErrNoRows {
+		return false, nil
+	}
+
+	return true, nil
 }
 
-func (db *PgDB) ProfilesCount() (int, error) {
-	return db.Model(&Profile{}).Count()
+func (db *MongoDB) ProfilesCount() (int64, error) {
+	collection := db.collections[ProfilesDB]
+	count, err := collection.CountDocuments(db.ctx, bson.D{})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

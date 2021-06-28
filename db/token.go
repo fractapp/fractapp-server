@@ -1,25 +1,53 @@
 package db
 
+import (
+	"go.mongodb.org/mongo-driver/bson"
+)
+
 type Token struct {
-	Id    string `pg:",use_zero"`
-	Token string `pg:",use_zero"`
+	Id        ID     `bson:"_id"`
+	ProfileId ID     `bson:"profile"`
+	Token     string `bson:"token"`
 }
 
-func (db *PgDB) IdByToken(token string) (string, error) {
+func (db *MongoDB) TokenByValue(token string) (*Token, error) {
 	tokenDb := &Token{}
-	err := db.Model(tokenDb).Where("token = ?", token).Select()
+
+	collection := db.collections[TokensDB]
+
+	res := collection.FindOne(db.ctx, bson.D{
+		{"token", token},
+	}, nil)
+	err := res.Err()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return tokenDb.Id, nil
+	err = res.Decode(tokenDb)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenDb, nil
 }
-func (db *PgDB) TokenById(id string) (string, error) {
+
+func (db *MongoDB) TokenByProfileId(id ID) (*Token, error) {
 	tokenDb := &Token{}
-	err := db.Model(tokenDb).Where("id = ?", id).Select()
+
+	collection := db.collections[TokensDB]
+
+	res := collection.FindOne(db.ctx, bson.D{
+		{"profile", id},
+	}, nil)
+	err := res.Err()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return tokenDb.Token, nil
+	err = res.Decode(tokenDb)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenDb, nil
 }

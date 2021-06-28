@@ -3,18 +3,13 @@ package websocket
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/controller/middleware"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
 	"fractapp-server/types"
 	"fractapp-server/utils"
-	"io/ioutil"
-	"math/big"
 	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -228,7 +223,7 @@ func writeMsg(sender string, msg *MessageRq, pgDB db.DB) error {
 		return err
 	}
 
-	if strings.HasPrefix(msg.Value, "/") {
+	/*if strings.HasPrefix(msg.Value, "/") {
 
 		switch Action(msg.Value[1:]) {
 		case AddTxToChat:
@@ -354,7 +349,7 @@ func writeMsg(sender string, msg *MessageRq, pgDB db.DB) error {
 		if err != nil {
 			return err
 		}
-	}
+	}*/
 
 	msgs, err := pgDB.MessagesBySenderAndReceiver(dbMessage.SenderId, dbMessage.ReceiverId)
 	if err != nil {

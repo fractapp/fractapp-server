@@ -9,8 +9,8 @@ require (
 	github.com/ChainSafe/go-schnorrkel v0.0.0-20201021020641-d3c6d3118d10
 	github.com/Workiva/go-datastructures v1.0.52 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
+	github.com/apmckinlay/gsuneido v0.0.0-20210623205601-06e95714c5af // indirect
 	github.com/btcsuite/btcutil v1.0.2
-	github.com/centrifuge/go-substrate-rpc-client/v2 v2.1.0
 	github.com/ethereum/go-ethereum v1.9.25
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/jwtauth v1.1.1
@@ -26,9 +26,9 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/swaggo/http-swagger v1.0.0
 	github.com/swaggo/swag v1.7.0
+	go.mongodb.org/mongo-driver v1.5.3
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000 // indirect
-	golang.org/x/sys v0.0.0-20210315160823-c6e025ad8005 // indirect
 	golang.org/x/tools v0.1.0 // indirect
 	google.golang.org/api v0.35.0
 	gotest.tools v2.2.0+incompatible

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fractapp-server/config"
@@ -18,8 +17,10 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
-	"github.com/go-pg/pg/v10"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -41,7 +42,7 @@ func init() {
 	flag.Parse()
 }
 
-var database *db.PgDB
+var database db.DB
 var notificator firebase.TxNotificator
 
 func main() {
@@ -58,21 +59,28 @@ func main() {
 		log.Fatalf("Invalid create notificator: %s", err.Error())
 	}
 
-	// connect to db
-	pgDb := pg.Connect(&pg.Options{
-		Addr:     config.DB.Host,
-		User:     config.DB.User,
-		Password: config.DB.Password,
-		Database: config.DB.Database,
-		TLSConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	})
-	if err := pgDb.Ping(ctx); err != nil {
-		log.Fatalf("Invalid connect to db: %s", err.Error())
+	//TODO: add ctx with timeout
+	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(config.DBConnectionString))
+	if err != nil {
+		panic(err)
 	}
 
-	database = (*db.PgDB)(pgDb)
+	defer func() {
+		if err = mongoClient.Disconnect(ctx); err != nil {
+			panic(err)
+		}
+	}()
+
+	// Ping the primary
+	if err := mongoClient.Ping(ctx, readpref.Primary()); err != nil {
+		panic(err)
+	}
+
+	database, err = db.NewMongoDB(ctx, mongoClient)
+	if err != nil {
+		panic(err)
+	}
+
 	// create http server
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -149,7 +157,9 @@ func notifyRoute(w http.ResponseWriter, r *http.Request) error {
 }
 
 func sendNotification(addressForNotificator string, memberAddress string, txType firebase.TxType, currency types.Currency, value string) error {
-	sub, err := database.SubscriberByAddress(addressForNotificator)
+	network := types.NetworkByCurrency(currency)
+
+	profile, err := database.ProfileByAddress(network, memberAddress)
 	if err != nil && err != db.ErrNoRows {
 		return err
 	}
@@ -157,36 +167,35 @@ func sendNotification(addressForNotificator string, memberAddress string, txType
 		return nil
 	}
 
-	profile, err := database.ProfileByAddress(memberAddress)
+	sub, err := database.SubscriberByProfileId(profile.Id)
 	if err != nil && err != db.ErrNoRows {
 		return err
+	}
+	if err == db.ErrNoRows {
+		return nil
 	}
 
 	amount, _ := new(big.Int).SetString(value, 10)
 	fAmount, _ := currency.ConvertFromPlanck(amount).Float64()
-	if err == db.ErrNoRows || profile == nil {
-		msg := notificator.MsgForAddress(memberAddress, txType, fAmount, currency)
-		log.Infof("Notify (%s): %s \n", sub.Address, msg)
 
-		notifyErr := notificator.Notify("", msg, sub.Token)
-		if notifyErr != nil {
-			log.Errorf("%d \n", notifyErr)
-		}
+	msg := notificator.MsgForAuthed(txType, fAmount, currency)
+	address, ok := profile.Addresses[network]
+	if !ok {
+		return nil
+	}
+
+	log.Infof("Notify (%s): %s \n", address, msg)
+
+	name := ""
+	if profile.Name != "" {
+		name = profile.Name
 	} else {
-		msg := notificator.MsgForAuthed(txType, fAmount, currency)
-		log.Infof("Notify (%s): %s \n", sub.Address, msg)
+		name = "@" + profile.Username
+	}
 
-		name := ""
-		if profile.Name != "" {
-			name = profile.Name
-		} else {
-			name = "@" + profile.Username
-		}
-
-		notifyErr := notificator.Notify(name, msg, sub.Token)
-		if notifyErr != nil {
-			log.Errorf("%d \n", notifyErr)
-		}
+	notifyErr := notificator.Notify(name, msg, sub.Token)
+	if notifyErr != nil {
+		log.Errorf("%d \n", notifyErr)
 	}
 
 	return nil

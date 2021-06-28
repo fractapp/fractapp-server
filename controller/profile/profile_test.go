@@ -359,7 +359,7 @@ func TestUpdateProfile(t *testing.T) {
 		LastUpdate:  123,
 	}
 	rq := &UpdateProfileRq{
-		Name:     "New Name",
+		Name:     "New name",
 		Username: "newusername",
 	}
 	b, err := json.Marshal(rq)

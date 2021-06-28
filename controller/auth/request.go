@@ -9,9 +9,8 @@ type TokenRs struct {
 	Token string `json:"token"` // JWT token
 }
 type SendCodeRq struct {
-	Type      notification.NotificatorType `enums:"0,1"` // Message type (0 - sms / 1 - email)
-	CheckType notification.CheckType       `enums:"0"`   // Now it is always zero. But in future it will have more types.
-	Value     string                       // Email address or Phone number (without +)
+	Type  notification.NotificatorType `enums:"0,1"` // Message type (0 - sms / 1 - email)
+	Value string                       // Email address or Phone number (without +)
 }
 type ConfirmAuthRq struct {
 	Value     string                       // Email address or Phone number (without +)

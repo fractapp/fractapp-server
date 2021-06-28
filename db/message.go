@@ -1,18 +1,37 @@
 package db
 
+import (
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
 type Message struct {
-	Id          string `pg:",pk"`
-	Value       string `pg:",use_zero"`
-	SenderId    string `pg:",use_zero"`
-	ReceiverId  string `pg:",use_zero"`
-	Timestamp   int64  `pg:",use_zero"`
-	IsDelivered bool
+	Id          ID     `bson:"_id"`
+	Value       string `bson:"value"`
+	SenderId    ID     `bson:"sender_id"`   //TODO ref
+	ReceiverId  ID     `bson:"receiver_id"` //TODO ref
+	Timestamp   int64  `bson:"timestamp"`
+	IsDelivered bool   `bson:"is_delivered"`
 }
 
-func (db *PgDB) NotDeliveredMessages() ([]Message, error) {
-	var messages []Message
-	err := db.Model(&messages).Where("is_delivered = ?", false).Order("timestamp ASC").Select()
+func (db *MongoDB) MessagesByReceiver(receiver ID) ([]Message, error) {
+	collection := db.collections[MessagesDB]
 
+	opt := options.FindOne()
+	opt.SetSort(bson.D{{"timestamp", 1}})
+
+	var messages []Message
+	res := collection.FindOne(db.ctx, bson.D{
+		{"receiver_id", receiver},
+		{"is_delivered", false},
+	}, opt)
+	err := res.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Decode(messages)
 	if err != nil {
 		return nil, err
 	}
@@ -20,11 +39,24 @@ func (db *PgDB) NotDeliveredMessages() ([]Message, error) {
 	return messages, nil
 }
 
-func (db *PgDB) MessagesByReceiver(id string) ([]Message, error) {
-	var messages []Message
-	err := db.Model(&messages).
-		Where("receiver_id = ?", id).Where("is_delivered = ?", false).Order("timestamp ASC").Select()
+func (db *MongoDB) MessagesBySenderAndReceiver(sender ID, receiver ID) ([]Message, error) {
+	collection := db.collections[MessagesDB]
 
+	opt := options.FindOne()
+	opt.SetSort(bson.D{{"timestamp", 1}})
+
+	var messages []Message
+	res := collection.FindOne(db.ctx, bson.D{
+		{"sender_id", sender},
+		{"receiver_id", receiver},
+		{"is_delivered", false},
+	}, opt)
+	err := res.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Decode(messages)
 	if err != nil {
 		return nil, err
 	}
@@ -32,22 +64,10 @@ func (db *PgDB) MessagesByReceiver(id string) ([]Message, error) {
 	return messages, nil
 }
 
-func (db *PgDB) MessagesBySenderAndReceiver(sender string, receiver string) ([]Message, error) {
-	var messages []Message
-	err := db.Model(&messages).
-		Where("sender_id = ?", sender).Where("receiver_id = ?", receiver).Where("is_delivered = ?", false).Order("timestamp ASC").Select()
+func (db *MongoDB) UpdateDeliveredMessage(id primitive.ObjectID) error {
+	collection := db.collections[MessagesDB]
 
-	if err != nil {
-		return nil, err
-	}
-
-	return messages, nil
-}
-
-func (db *PgDB) UpdateDeliveredMessage(id string, receiverId string) error {
-	_, err := db.Model(&Message{
-		IsDelivered: true,
-	}).Where("receiver_id = ?", receiverId).Where("id = ?", id).Column("is_delivered").Update()
+	_, err := collection.UpdateByID(db.ctx, id, nil)
 	if err != nil {
 		return err
 	}

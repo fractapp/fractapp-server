@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -16,7 +15,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-pg/pg/v10"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -55,26 +56,33 @@ func main() {
 		log.Fatalf("Invalid parse config: %s", err.Error())
 	}
 
-	// connect to db
-	database := pg.Connect(&pg.Options{
-		Addr:     config.DB.Host,
-		User:     config.DB.User,
-		Password: config.DB.Password,
-		Database: config.DB.Database,
-		TLSConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	})
-
 	binanceApi = config.BinanceApi
 
-	if err := database.Ping(ctx); err != nil {
-		log.Fatalf("Invalid parse config: %s", err.Error())
+	//TODO: add ctx with timeout
+	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(config.DBConnectionString))
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		if err = mongoClient.Disconnect(ctx); err != nil {
+			panic(err)
+		}
+	}()
+
+	// Ping the primary
+	if err := mongoClient.Ping(ctx, readpref.Primary()); err != nil {
+		panic(err)
+	}
+
+	mongoDB, err := db.NewMongoDB(ctx, mongoClient)
+	if err != nil {
+		panic(err)
 	}
 
 	go func() {
 		for {
-			err := startScanForCurrency((*db.PgDB)(database), ctx)
+			err := startScanForCurrency(mongoDB, ctx)
 			if err != nil {
 				log.Errorf("invalid start scan: %s", err)
 				continue
@@ -181,15 +189,15 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 		chArray := make([]chan bool, 0)
 
 		for i := 0; i < 8; i++ {
-			chArray = append(chArray, write(prices, divider*i, divider*(i+1), database, ctx))
+			chArray = append(chArray, write(prices, divider*i, divider*(i+1), database))
 		}
-		chArray = append(chArray, write(prices, divider*9, pricesLen, database, ctx))
+		chArray = append(chArray, write(prices, divider*9, pricesLen, database))
 
 		for _, v := range chArray {
 			<-v
 		}
 	} else {
-		write(prices, 0, pricesLen, database, ctx)
+		write(prices, 0, pricesLen, database)
 	}
 
 	log.Infof("End insert to db")
@@ -198,7 +206,7 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 	return nil
 }
 
-func write(prices [][]interface{}, startIndex int, endIndex int, database db.DB, ctx context.Context) chan bool {
+func write(prices [][]interface{}, startIndex int, endIndex int, database db.DB) chan bool {
 	var dbPrices []interface{}
 
 	now := time.Now().Unix() * 1000
@@ -222,7 +230,7 @@ func write(prices [][]interface{}, startIndex int, endIndex int, database db.DB,
 			chResult <- true
 			return
 		}
-		err := database.InsertBatch(ctx, dbPrices)
+		err := database.InsertMany(dbPrices)
 		if err != nil {
 			log.Errorf("Insert price to db (%d:%d): %s", startIndex, endIndex, err)
 		}

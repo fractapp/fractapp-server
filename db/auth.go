@@ -2,27 +2,36 @@ package db
 
 import (
 	"fractapp-server/notification"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Auth struct {
-	Value     string                       `pg:"value,pk"`
-	IsValid   bool                         `pg:"is_valid,use_zero"`
-	Code      string                       `pg:",use_zero"`
-	Attempts  int32                        `pg:",use_zero"`
-	Count     int32                        `pg:",use_zero"`
-	Timestamp int64                        `pg:",use_zero"`
-	Type      notification.NotificatorType `pg:",use_zero"`
-	CheckType notification.CheckType       `pg:",use_zero"`
+	Id        ID                           `bson:"_id"`
+	Value     string                       `bson:"value"`
+	IsValid   bool                         `bson:"is_valid"`
+	Code      string                       `bson:"code"`
+	Attempts  int32                        `bson:"attempts"`
+	Count     int32                        `bson:"count"`
+	Timestamp int64                        `bson:"timestamp"`
+	Type      notification.NotificatorType `bson:"type"`
 }
 
-func (db *PgDB) AuthByValue(value string, codeType notification.NotificatorType, checkType notification.CheckType) (*Auth, error) {
+func (db *MongoDB) AuthByValue(value string, codeType notification.NotificatorType) (*Auth, error) {
+	collection := db.collections[AuthDB]
 	auth := &Auth{}
-	err := db.Model(auth).Where("value = ?", value).
-		Where("type = ?", codeType).
-		Where("check_type = ?", checkType).Select()
+	res := collection.FindOne(db.ctx, bson.D{
+		{"value", value},
+		{"type", codeType},
+	})
+	err := res.Err()
 	if err != nil {
 		return nil, err
 	}
 
+	err = res.Decode(auth)
+	if err != nil {
+		return nil, err
+	}
 	return auth, nil
 }

@@ -1,41 +1,46 @@
 package db
 
-import "fractapp-server/types"
+import (
+	"go.mongodb.org/mongo-driver/bson"
+)
 
 type Subscriber struct {
-	Address string        `pg:",pk"`
-	Token   string        `pg:",use_zero"`
-	Network types.Network `pg:",use_zero"`
+	Id        ID     `bson:"_id"`
+	ProfileId ID     `bson:"profile"`
+	Token     string `bson:"token"`
+	Timestamp int64  `bson:"timestamp"`
 }
 
-func (db *PgDB) SubscribersCountByToken(token string) (int, error) {
-	return db.Model(&Subscriber{}).
-		Where("token = ?", token).Count()
-}
-func (db *PgDB) SubscriberByAddress(address string) (*Subscriber, error) {
-	sub := &Subscriber{}
-	err := db.Model(sub).Where("address = ?", address).Select()
-	if err != nil {
-		return nil, err
-	}
+func (db *MongoDB) SubscribersCountByToken(token string) (int64, error) {
+	collection := db.collections[SubscribersDB]
 
-	return sub, nil
-}
-func (db *PgDB) SubscribersByRange(from int, limit int) ([]Subscriber, error) {
-	sub := make([]Subscriber, 0)
-	err := db.Model(&sub).Offset(from).Limit(limit).Select()
-	if err != nil {
-		return nil, err
-	}
-
-	return sub, nil
-}
-
-func (db *PgDB) SubscribersCount() (int, error) {
-	count, err := db.Model(&Subscriber{}).Count()
+	count, err := collection.CountDocuments(db.ctx, bson.D{
+		{"token", token},
+	}, nil)
 	if err != nil {
 		return 0, err
 	}
 
 	return count, nil
+}
+
+func (db *MongoDB) SubscriberByProfileId(id ID) (*Subscriber, error) {
+	var subscriber *Subscriber
+
+	collection := db.collections[SubscribersDB]
+
+	res := collection.FindOne(db.ctx, bson.D{
+		{"profile", id},
+	}, nil)
+	err := res.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Decode(subscriber)
+	if err != nil {
+		return nil, err
+	}
+
+	return subscriber, nil
 }
