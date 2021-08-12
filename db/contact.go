@@ -5,7 +5,7 @@ import (
 )
 
 type Contact struct {
-	Id          string `bson:"_id"`
+	Id          ID     `bson:"_id"`
 	ProfileId   ID     `bson:"profile"`
 	PhoneNumber string `pg:"phone_number"`
 }
@@ -13,7 +13,7 @@ type Contact struct {
 func (db *MongoDB) AllContacts(profileId ID) ([]Contact, error) {
 	collection := db.collections[ContactsDB]
 
-	var c []Contact
+	c := make([]Contact, 0)
 	res, err := collection.Find(db.ctx, bson.D{
 		{"profile", profileId},
 	})
@@ -21,7 +21,7 @@ func (db *MongoDB) AllContacts(profileId ID) ([]Contact, error) {
 		return nil, err
 	}
 
-	err = res.Decode(c)
+	err = res.All(db.ctx, &c)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (db *MongoDB) AllMatchContacts(id ID) ([]Profile, error) {
 
 	collection := db.collections[ContactsDB]
 
-	var contactsWhoHaveUser []Contact
+	contactsWhoHaveUser := make([]Contact, 0)
 	res, err := collection.Find(db.ctx, bson.D{
 		{"phone_number", profile.PhoneNumber},
 	})
@@ -45,12 +45,12 @@ func (db *MongoDB) AllMatchContacts(id ID) ([]Profile, error) {
 		return nil, err
 	}
 
-	err = res.Decode(contactsWhoHaveUser)
+	err = res.All(db.ctx, &contactsWhoHaveUser)
 	if err != nil {
 		return nil, err
 	}
 
-	var usersContacts []Contact
+	usersContacts := make([]Contact, 0)
 	res, err = collection.Find(db.ctx, bson.D{
 		{"profile", id},
 	})
@@ -58,7 +58,7 @@ func (db *MongoDB) AllMatchContacts(id ID) ([]Profile, error) {
 		return nil, err
 	}
 
-	err = res.Decode(usersContacts)
+	err = res.All(db.ctx, &usersContacts)
 	if err != nil {
 		return nil, err
 	}

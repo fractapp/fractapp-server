@@ -43,19 +43,6 @@ func (n Network) String() string {
 	return "polkadot"
 }
 
-func NetworkByCurrency(currency Currency) (n Network) {
-	n = Polkadot
-
-	switch currency {
-	case DOT:
-		n = Polkadot
-	case KSM:
-		n = Kusama
-	}
-
-	return n
-}
-
 func ParseNetwork(name string) (n Network) {
 	n = Polkadot
 

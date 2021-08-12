@@ -17,7 +17,6 @@ type Profile struct {
 	Username    string                    `bson:"username"`
 	PhoneNumber string                    `bson:"phone_number"`
 	Email       string                    `bson:"email"`
-	IsMigratory bool                      `bson:"is_migratory"`
 	AvatarExt   string                    `bson:"avatar_ext"`
 	LastUpdate  int64                     `bson:"last_update"`
 	IsChatBot   bool                      `bson:"is_chat_bot"`
@@ -32,9 +31,10 @@ func (db *MongoDB) profileBy(property string, value interface{}) (*Profile, erro
 	p := &Profile{}
 
 	collection := db.collections[ProfilesDB]
-	res, err := collection.Find(db.ctx, bson.D{
+	res := collection.FindOne(db.ctx, bson.D{
 		{property, value},
 	})
+	err := res.Err()
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (db *MongoDB) profileBy(property string, value interface{}) (*Profile, erro
 }
 
 func (db *MongoDB) SearchUsersByUsername(value string, limit int64) ([]Profile, error) {
-	var profiles []Profile
+	profiles := make([]Profile, 0)
 
 	opt := options.Find()
 	opt.SetLimit(limit)
@@ -61,7 +61,7 @@ func (db *MongoDB) SearchUsersByUsername(value string, limit int64) ([]Profile, 
 		return nil, err
 	}
 
-	err = res.Decode(profiles)
+	err = res.All(db.ctx, &profiles)
 	if err != nil {
 		return nil, err
 	}
@@ -69,17 +69,7 @@ func (db *MongoDB) SearchUsersByUsername(value string, limit int64) ([]Profile, 
 	return profiles, err
 }
 func (db *MongoDB) SearchUsersByEmail(email string) (*Profile, error) {
-	p := &Profile{}
-
-	collection := db.collections[ProfilesDB]
-	res, err := collection.Find(db.ctx, bson.D{
-		{"email", email},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	err = res.Decode(p)
+	p, err := db.profileBy("email", email)
 	if err != nil {
 		return nil, err
 	}

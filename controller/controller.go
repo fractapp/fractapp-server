@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 )
@@ -27,4 +28,18 @@ func Route(c Controller, route string) func(w http.ResponseWriter, r *http.Reque
 		}
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func JSON(w http.ResponseWriter, v interface{}) error {
+	rsByte, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

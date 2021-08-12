@@ -17,7 +17,7 @@ func (db *MongoDB) TokenByValue(token string) (*Token, error) {
 
 	res := collection.FindOne(db.ctx, bson.D{
 		{"token", token},
-	}, nil)
+	})
 	err := res.Err()
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (db *MongoDB) TokenByProfileId(id ID) (*Token, error) {
 
 	res := collection.FindOne(db.ctx, bson.D{
 		{"profile", id},
-	}, nil)
+	})
 	err := res.Err()
 	if err != nil {
 		return nil, err

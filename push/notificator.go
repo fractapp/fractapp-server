@@ -1,4 +1,4 @@
-package firebase
+package push
 
 import (
 	"context"
@@ -20,7 +20,7 @@ const (
 	Received
 )
 
-type TxNotificator interface {
+type Notificator interface {
 	Notify(title string, msg string, token string) error
 	MsgForAuthed(txType TxType, amount float64, currency types.Currency) string
 	MsgForAddress(address string, txType TxType, amount float64, currency types.Currency) string
@@ -31,7 +31,7 @@ type Client struct {
 	msgClient *messaging.Client
 }
 
-func NewClient(ctx context.Context, credentialsFile string, projectId string) (*Client, error) {
+func NewClient(ctx context.Context, credentialsFile string, projectId string) (Notificator, error) {
 	opt := option.WithCredentialsFile(credentialsFile)
 	config := &firebase.Config{ProjectID: projectId}
 	app, err := firebase.NewApp(context.Background(), config, opt)
@@ -68,7 +68,6 @@ func (n *Client) Notify(title string, msg string, token string) error {
 	}
 	return nil
 }
-
 func (n *Client) MsgForAuthed(txType TxType, amount float64, currency types.Currency) string {
 	switch txType {
 	case Sent:

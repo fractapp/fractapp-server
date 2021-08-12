@@ -33,11 +33,6 @@ definitions:
     type: object
   auth.SendCodeRq:
     properties:
-      checkType:
-        description: Now it is always zero. But in future it will have more types.
-        enum:
-        - 0
-        type: integer
       type:
         description: Message type (0 - sms / 1 - email)
         enum:
@@ -54,37 +49,30 @@ definitions:
         description: JWT token
         type: string
     type: object
+  info.Price:
+    properties:
+      currency:
+        type: integer
+      value:
+        type: number
+    type: object
+  info.SubstrateUrl:
+    properties:
+      network:
+        type: integer
+      url:
+        type: string
+    type: object
   info.TotalInfo:
     properties:
-      price:
-        additionalProperties:
-          type: number
-        type: object
+      prices:
+        items:
+          $ref: '#/definitions/info.Price'
+        type: array
       substrateUrls:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
-  notification.UpdateTokenRq:
-    properties:
-      address:
-        description: Blockchain address
-        type: string
-      network:
-        description: network id (0 - polkadot/ 1 - kusama) from address
-        type: integer
-      pubKey:
-        description: Public key from address
-        type: string
-      sign:
-        description: 'signature for message (more information here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md)'
-        type: string
-      timestamp:
-        description: timestamp from message
-        type: integer
-      token:
-        description: firebase token
-        type: string
+        items:
+          $ref: '#/definitions/info.SubstrateUrl'
+        type: array
     type: object
   profile.Balance:
     properties:
@@ -99,13 +87,13 @@ definitions:
       email:
         type: string
       id:
-        description: id from info
+        description: id from userInfo
         type: string
       isMigratory:
         description: always false. This property is for the future
         type: boolean
       lastUpdate:
-        description: timestamp of the last info update
+        description: timestamp of the last userInfo update
         type: integer
       name:
         description: name in fractapp
@@ -127,10 +115,13 @@ definitions:
         description: avatar format (png/jpg/jpeg)
         type: string
       id:
-        description: id from info
+        description: id from userInfo
         type: string
+      isChatBot:
+        description: always false. This property is for the future
+        type: boolean
       lastUpdate:
-        description: timestamp of the last info update
+        description: timestamp of the last userInfo update
         type: integer
       name:
         type: string
@@ -143,11 +134,9 @@ definitions:
         type: integer
       fee:
         type: string
-      floatFee:
-        type: string
-      floatValue:
-        type: string
       from:
+        type: string
+      hash:
         type: string
       id:
         type: string
@@ -157,14 +146,6 @@ definitions:
         type: integer
       to:
         type: string
-      usdFee:
-        type: number
-      usdValue:
-        type: number
-      userFrom:
-        type: string
-      userTo:
-        type: string
       value:
         type: string
     type: object
@@ -172,6 +153,11 @@ definitions:
     properties:
       status:
         type: integer
+    type: object
+  profile.UpdateFirebaseTokenRq:
+    properties:
+      token:
+        type: string
     type: object
   profile.UpdateProfileRq:
     properties:
@@ -293,7 +279,7 @@ paths:
         name: rq
         required: true
         schema:
-          $ref: '#/definitions/notification.UpdateTokenRq'
+          $ref: '#/definitions/profile.UpdateFirebaseTokenRq'
       produces:
       - application/json
       responses:
@@ -329,36 +315,6 @@ paths:
       summary: Get user avatar
       tags:
       - Profile
-  /profile/balance:
-    get:
-      consumes:
-      - application/json
-      operationId: getBalance
-      parameters:
-      - description: address
-        in: query
-        name: address
-        required: true
-        type: string
-      - description: currency
-        in: query
-        name: currency
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/profile.Balance'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-      summary: Get balance by address
-      tags:
-      - Profile
   /profile/contacts:
     get:
       consumes:
@@ -380,35 +336,6 @@ paths:
       security:
       - AuthWithJWT: []
       summary: Get my contacts
-      tags:
-      - Profile
-  /profile/info:
-    get:
-      consumes:
-      - application/json
-      description: get user by id or blockchain address
-      operationId: profileInfo
-      parameters:
-      - description: get user profile by user id
-        in: query
-        name: id
-        type: string
-      - description: get user profile by blockchain address
-        in: query
-        name: address
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/profile.ShortUserProfile'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-      summary: Get user
       tags:
       - Profile
   /profile/matchContacts:
@@ -487,6 +414,76 @@ paths:
         "404":
           description: ""
       summary: Search user
+      tags:
+      - Profile
+  /profile/substrate/balance:
+    get:
+      consumes:
+      - application/json
+      operationId: getBalance
+      parameters:
+      - description: address
+        in: query
+        name: address
+        required: true
+        type: string
+      - description: currency
+        in: query
+        name: currency
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.Balance'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get substrateBalance by address
+      tags:
+      - Profile
+  /profile/substrate/fee:
+    get:
+      consumes:
+      - application/json
+      operationId: substrateTxBase
+      parameters:
+      - description: sender
+        in: query
+        name: sender
+        required: true
+        type: string
+      - description: receiver
+        in: query
+        name: receiver
+        required: true
+        type: string
+      - description: currency
+        in: query
+        name: currency
+        required: true
+        type: integer
+      - description: value
+        in: query
+        name: value
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.Balance'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Calculate fee for substrate tx
       tags:
       - Profile
   /profile/transaction/status:
@@ -626,6 +623,32 @@ paths:
       security:
       - AuthWithJWT: []
       summary: Upload my phone numbers of contacts
+      tags:
+      - Profile
+  /profile/userInfo:
+    get:
+      consumes:
+      - application/json
+      description: get user by id
+      operationId: profileInfo
+      parameters:
+      - description: get user profile by user id
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.ShortUserProfile'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get user
       tags:
       - Profile
   /profile/username:

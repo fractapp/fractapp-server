@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fractapp-server/config"
 	"fractapp-server/db"
-	"fractapp-server/firebase"
+	"fractapp-server/push"
 	"fractapp-server/types"
 	"io/ioutil"
 	"math/big"
@@ -43,7 +43,7 @@ func init() {
 }
 
 var database db.DB
-var notificator firebase.TxNotificator
+var notificator push.Notificator
 
 func main() {
 	log.Info("Start price cache ...")
@@ -54,7 +54,7 @@ func main() {
 		log.Fatalf("Invalid parse config: %s", err.Error())
 	}
 
-	notificator, err = firebase.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
+	notificator, err = push.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
 	if err != nil {
 		log.Fatalf("Invalid create notificator: %s", err.Error())
 	}
@@ -143,12 +143,12 @@ func notifyRoute(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	currency := types.Currency(nRq.Currency)
-	err = sendNotification(nRq.From, nRq.To, firebase.Sent, currency, nRq.Value)
+	err = sendNotification(nRq.From, nRq.To, push.Sent, currency, nRq.Value)
 	if err != nil {
 		return err
 	}
 
-	err = sendNotification(nRq.To, nRq.From, firebase.Received, currency, nRq.Value)
+	err = sendNotification(nRq.To, nRq.From, push.Received, currency, nRq.Value)
 	if err != nil {
 		return err
 	}
@@ -156,8 +156,9 @@ func notifyRoute(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func sendNotification(addressForNotificator string, memberAddress string, txType firebase.TxType, currency types.Currency, value string) error {
-	network := types.NetworkByCurrency(currency)
+//TODO: invalid receiver and address receiver/sender
+func sendNotification(addressForNotificator string, memberAddress string, txType push.TxType, currency types.Currency, value string) error {
+	network := currency.Network()
 
 	profile, err := database.ProfileByAddress(network, memberAddress)
 	if err != nil && err != db.ErrNoRows {

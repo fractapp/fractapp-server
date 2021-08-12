@@ -13,12 +13,7 @@
     "AccountSid": "",
     "AuthToken": ""
   },
-  "DB": {
-    "Host": "",
-    "User": "",
-    "Password": "",
-    "Database": ""
-  },
+  "DBConnectionString": "",
   "Secret": "",
   "SMTP": {
     "Host": "",

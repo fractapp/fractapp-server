@@ -21,11 +21,42 @@ type ShortUserProfile struct {
 	Name       string                   `json:"name"`
 	Username   string                   `json:"username"`
 	AvatarExt  string                   `json:"avatarExt"`  // avatar format (png/jpg/jpeg)
+	IsChatBot  bool                     `json:"isChatBot"`  // always false. This property is for the future
 	LastUpdate int64                    `json:"lastUpdate"` // timestamp of the last userInfo update
 	Addresses  map[types.Network]string `json:"addresses"`  // String addresses by network (0 - polkadot/ 1 - kusama) from account
 }
 
+type TxStatusRs struct {
+	Status int64 `json:"status"`
+}
+
+type Balance struct {
+	Value string `json:"value"`
+}
+
+type FeeInfo struct {
+	Fee string `json:"fee"`
+}
+
+type MyContacts map[string]ShortUserProfile // map with id->short user userInfo
+
+type UpdateFirebaseTokenRq struct {
+	Token string
+}
+
 type Transaction struct {
+	ID        string `json:"id"`
+	Hash      string `json:"hash"`
+	Currency  int    `json:"currency"`
+	To        string `json:"to"`
+	From      string `json:"from"`
+	Value     string `json:"value"`
+	Fee       string `json:"fee"`
+	Timestamp int64  `json:"timestamp"`
+	Status    int64  `json:"status"`
+}
+
+type TransactionRs struct {
 	ID   string `json:"id"`
 	Hash string `json:"hash"`
 
@@ -47,18 +78,4 @@ type Transaction struct {
 
 	Timestamp int64 `json:"timestamp"`
 	Status    int64 `json:"status"`
-}
-
-type TxStatusRs struct {
-	Status int64 `json:"status"`
-}
-
-type Balance struct {
-	Value string `json:"value"`
-}
-
-type MyContacts map[string]ShortUserProfile // map with id->short user userInfo
-
-type UpdateFirebaseTokenRq struct {
-	Token string
 }

@@ -13,14 +13,11 @@ import (
 	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/jwtauth"
-
-	"github.com/go-pg/pg/v10"
 )
 
 const (
@@ -136,14 +133,15 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	auth, err := c.db.AuthByValue(rq.Value, rq.Type)
-	if err != nil && err != pg.ErrNoRows {
+	if err != nil && err != db.ErrNoRows {
 		return err
 	}
 
 	now := time.Now()
 
-	if err == pg.ErrNoRows || auth == nil {
+	if err == db.ErrNoRows || auth == nil {
 		auth = &db.Auth{
+			Id:      db.NewId(),
 			Value:   rq.Value,
 			Type:    rq.Type,
 			IsValid: true,
@@ -168,7 +166,7 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 	auth.Attempts = 0
 	auth.IsValid = true
 
-	if err == pg.ErrNoRows {
+	if err == db.ErrNoRows {
 		err = c.db.Insert(auth)
 	} else {
 		err = c.db.UpdateByPK(auth.Id, auth)
@@ -230,7 +228,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 
 	id := middleware.AuthId(r)
 	profile, err := c.db.ProfileByAuthId(id)
-	if err != nil && err != pg.ErrNoRows {
+	if err != nil && err != db.ErrNoRows {
 		return err
 	}
 
@@ -290,22 +288,17 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 
-		//Generate username
-		username := ""
-		min := 10
-		max := 30
-		fmt.Println(rand.Intn(max-min+1) + min)
-
 		total, err := c.db.ProfilesCount()
 		if err != nil {
 			return err
 		}
-		username = fmt.Sprintf("%s%d", validators.UsernamePrefix, total)
+		username := fmt.Sprintf("%s%d", validators.UsernamePrefix, total)
 
 		profile = &db.Profile{
-			AuthId:      id,
-			IsMigratory: false,
-			Username:    username,
+			Id:        db.NewId(),
+			AuthId:    id,
+			Username:  username,
+			Addresses: addresses,
 		}
 
 		switch rq.Type {
@@ -328,7 +321,7 @@ func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 
 	dbToken, err := c.db.TokenByProfileId(profile.Id)
 	if err == db.ErrNoRows {
-		err = c.db.Insert(&db.Token{Token: tokenString, ProfileId: profile.Id})
+		err = c.db.Insert(&db.Token{Id: db.NewId(), Token: tokenString, ProfileId: profile.Id})
 	} else {
 		dbToken.Token = tokenString
 		err = c.db.UpdateByPK(dbToken.Id, dbToken)

@@ -31,7 +31,7 @@ func (db *MongoDB) SubscriberByProfileId(id ID) (*Subscriber, error) {
 
 	res := collection.FindOne(db.ctx, bson.D{
 		{"profile", id},
-	}, nil)
+	})
 	err := res.Err()
 	if err != nil {
 		return nil, err

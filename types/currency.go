@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type Currency int
+type Currency int32
 
 const (
 	DOT Currency = iota
@@ -35,6 +35,19 @@ func (c Currency) Accuracy() int64 {
 	}
 
 	return 1000
+}
+
+func (c Currency) Network() (n Network) {
+	n = Polkadot
+
+	switch c {
+	case DOT:
+		n = Polkadot
+	case KSM:
+		n = Kusama
+	}
+
+	return n
 }
 
 func (c Currency) ConvertFromPlanckToView(amount *big.Int) *big.Float {

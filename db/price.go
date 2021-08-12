@@ -14,7 +14,7 @@ type Price struct {
 func (db *MongoDB) Prices(currency string, startTime int64, endTime int64) ([]Price, error) {
 	collection := db.collections[PricesDB]
 
-	var price []Price
+	price := make([]Price, 0)
 	res, err := collection.Find(db.ctx, bson.D{
 		{"currency", currency},
 		{"timestamp", bson.M{"$gte": startTime}},
@@ -24,7 +24,7 @@ func (db *MongoDB) Prices(currency string, startTime int64, endTime int64) ([]Pr
 		return nil, err
 	}
 
-	err = res.Decode(price)
+	err = res.All(db.ctx, &price)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (db *MongoDB) LastPriceByCurrency(currency string) (*Price, error) {
 
 	collection := db.collections[PricesDB]
 
-	var price *Price
+	price := new(Price)
 	res := collection.FindOne(db.ctx, bson.D{
 		{"currency", currency},
 	}, opt)

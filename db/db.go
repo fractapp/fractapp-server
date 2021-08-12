@@ -23,7 +23,7 @@ type MongoRef struct {
 type ID primitive.ObjectID
 
 var (
-	ErrNoRows            = mongo.ErrNilDocument //TODO
+	ErrNoRows            = mongo.ErrNoDocuments //TODO
 	InvalidCollectionErr = errors.New("invalid collection name")
 
 	AuthDB        name = "auth"
@@ -45,7 +45,7 @@ type DB interface {
 
 	MessagesByReceiver(receiver ID) ([]Message, error)
 	MessagesBySenderAndReceiver(sender ID, receiver ID) ([]Message, error)
-	UpdateDeliveredMessage(id primitive.ObjectID) error
+	SetDelivered(owner ID, id ID) error
 
 	Prices(currency string, startTime int64, endTime int64) ([]Price, error)
 	LastPriceByCurrency(currency string) (*Price, error)
@@ -70,7 +70,7 @@ type DB interface {
 
 	Insert(value interface{}) error
 	InsertMany(values []interface{}) error
-	UpdateByPK(id ID, value interface{}) error
+	UpdateByPK(Id ID, value interface{}) error
 }
 
 type MongoDB struct {
@@ -80,6 +80,9 @@ type MongoDB struct {
 	collections map[name]*mongo.Collection
 }
 
+func NewId() ID {
+	return ID(primitive.NewObjectID())
+}
 func NewMongoDB(ctx context.Context, client *mongo.Client) (*MongoDB, error) {
 	database := client.Database("fractapp")
 
@@ -87,7 +90,7 @@ func NewMongoDB(ctx context.Context, client *mongo.Client) (*MongoDB, error) {
 	_, err := collection.Indexes().CreateOne(
 		ctx,
 		mongo.IndexModel{
-			Keys:    bson.D{{Key: "value"}},
+			Keys:    bson.D{{Key: "value", Value: 1}},
 			Options: options.Index().SetUnique(true),
 		},
 	)
@@ -96,7 +99,7 @@ func NewMongoDB(ctx context.Context, client *mongo.Client) (*MongoDB, error) {
 	_, err = collection.Indexes().CreateOne(
 		ctx,
 		mongo.IndexModel{
-			Keys:    bson.D{{Key: "auth_id"}},
+			Keys:    bson.D{{Key: "auth_id", Value: 1}},
 			Options: options.Index().SetUnique(true),
 		},
 	)
@@ -124,19 +127,19 @@ func NewMongoDB(ctx context.Context, client *mongo.Client) (*MongoDB, error) {
 
 func (db *MongoDB) collection(value interface{}) (*mongo.Collection, error) {
 	switch value.(type) {
-	case Auth:
+	case *Auth:
 		return db.collections[AuthDB], nil
-	case Contact:
+	case *Contact:
 		return db.collections[ContactsDB], nil
-	case Message:
+	case *Message:
 		return db.collections[MessagesDB], nil
-	case Price:
+	case *Price:
 		return db.collections[PricesDB], nil
-	case Profile:
+	case *Profile:
 		return db.collections[ProfilesDB], nil
-	case Subscriber:
+	case *Subscriber:
 		return db.collections[SubscribersDB], nil
-	case Token:
+	case *Token:
 		return db.collections[TokensDB], nil
 	default:
 		return nil, InvalidCollectionErr
@@ -171,13 +174,13 @@ func (db *MongoDB) InsertMany(values []interface{}) error {
 	return nil
 }
 
-func (db *MongoDB) UpdateByPK(id ID, value interface{}) error {
+func (db *MongoDB) UpdateByPK(Id ID, value interface{}) error {
 	collection, err := db.collection(value)
 	if err != nil {
 		return err
 	}
 
-	_, err = collection.UpdateByID(db.ctx, id, value)
+	_, err = collection.UpdateOne(db.ctx, bson.D{{"_id", Id}}, bson.D{{"$set", value}})
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -35,7 +36,9 @@ const (
 	AvatarRoute              = "/avatar"
 	SubstrateBalanceRoute    = "/substrate/balance"
 	TransactionStatusRoute   = "/transaction/status"
+	TransactionsRoute        = "/transactions"
 	UpdateFirebaseTokenRoute = "/firebase"
+	SubstrateFeeRoute        = "/substrate/fee"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -100,6 +103,10 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.transactionStatus, nil
 	case UpdateFirebaseTokenRoute:
 		return c.updateFirebaseToken, nil
+	case TransactionsRoute:
+		return c.transactions, nil
+	case SubstrateFeeRoute:
+		return c.substrateTxBase, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -186,6 +193,7 @@ func (c *Controller) search(w http.ResponseWriter, r *http.Request) error {
 			Username:   v.Username,
 			AvatarExt:  v.AvatarExt,
 			LastUpdate: v.LastUpdate,
+			IsChatBot:  v.IsChatBot,
 			Addresses:  make(map[types.Network]string),
 		}
 
@@ -236,6 +244,7 @@ func (c *Controller) userInfo(w http.ResponseWriter, r *http.Request) error {
 		Username:   p.Username,
 		AvatarExt:  p.AvatarExt,
 		LastUpdate: p.LastUpdate,
+		IsChatBot:  p.IsChatBot,
 		Addresses:  make(map[types.Network]string),
 	}
 
@@ -276,7 +285,6 @@ func (c *Controller) myProfile(w http.ResponseWriter, r *http.Request) error {
 		Username:    profile.Username,
 		PhoneNumber: profile.PhoneNumber,
 		Email:       profile.Email,
-		IsMigratory: profile.IsMigratory,
 		AvatarExt:   profile.AvatarExt,
 		LastUpdate:  profile.LastUpdate,
 	}
@@ -517,6 +525,7 @@ func (c *Controller) myMatchContacts(w http.ResponseWriter, r *http.Request) err
 			Username:   v.Username,
 			AvatarExt:  v.AvatarExt,
 			LastUpdate: v.LastUpdate,
+			IsChatBot:  v.IsChatBot,
 			Addresses:  make(map[types.Network]string),
 		}
 
@@ -589,6 +598,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 		}
 
 		myContacts = append(myContacts, db.Contact{
+			Id:          db.NewId(),
 			ProfileId:   profileId,
 			PhoneNumber: v,
 		})
@@ -685,6 +695,146 @@ func (c *Controller) transactionStatus(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// username godoc
+// @Summary Get transactions by address
+// @ID getTransactions
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param address query string true "address"
+// @Param currency query int true "currency"
+// @Success 200 {object} Transaction
+// @Failure 400 {string} string
+// @Router /profile/transactions [get]
+func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error {
+	address := r.URL.Query().Get("address")
+	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
+	if err != nil {
+		return err
+	}
+	currency := types.Currency(currencyInt)
+
+	resp, err := http.Get(fmt.Sprintf("%s/transactions/%s?currency=%s", c.txApiHost, address, currency.String()))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	txs := make([]Transaction, 0)
+	err = json.Unmarshal(body, &txs)
+	if err != nil {
+		return err
+	}
+
+	responseTxs := make([]TransactionRs, 0)
+	for _, v := range txs {
+		txTime := time.Unix(v.Timestamp/1000, 0)
+		prices, err := c.db.Prices(currency.String(), txTime.
+			Add(-15*time.Minute).Unix()*1000, txTime.
+			Add(15*time.Minute).Unix()*1000)
+
+		if err != nil {
+			return err
+		}
+
+		price := float32(0)
+		// search for a value with a minimum difference from the transaction time
+		if len(prices) > 0 {
+			price = prices[0].Price
+			diff := v.Timestamp - prices[0].Timestamp
+			for _, p := range prices {
+				newDiff := v.Timestamp - p.Timestamp
+				if newDiff < 0 {
+					newDiff *= -1
+				}
+
+				if newDiff < diff {
+					diff = newDiff
+					price = p.Price
+				}
+			}
+		}
+
+		value, _ := new(big.Int).SetString(v.Value, 10)
+		fee, _ := new(big.Int).SetString(v.Fee, 10)
+
+		floatValue := currency.ConvertFromPlanck(value)
+		floatFee := currency.ConvertFromPlanck(fee)
+
+		a := currency.Accuracy()
+		aBig := new(big.Float).SetInt(big.NewInt(a))
+
+		fv, _ := new(big.Float).Mul(floatValue, aBig).Float32()
+		fv /= float32(a)
+		usdValue := price * fv
+
+		ff, _ := new(big.Float).Mul(floatFee, aBig).Float32()
+		ff /= float32(a)
+		usdFee := price * ff
+
+		userFrom := ""
+		p, err := c.db.ProfileByAddress(currency.Network(), v.From)
+		if err != nil && err != db.ErrNoRows {
+			return err
+		}
+		if p != nil {
+			userFrom = p.AuthId
+		}
+
+		userTo := ""
+		p, err = c.db.ProfileByAddress(currency.Network(), v.To)
+		if err != nil && err != db.ErrNoRows {
+			return err
+		}
+		if p != nil {
+			userTo = p.AuthId
+		}
+
+		responseTxs = append(responseTxs, TransactionRs{
+			ID:   v.ID,
+			Hash: v.Hash,
+
+			Currency: v.Currency,
+
+			From:     v.From,
+			UserFrom: userFrom,
+
+			To:     v.To,
+			UserTo: userTo,
+
+			Value:      v.Value,
+			UsdValue:   usdValue,
+			FloatValue: floatValue.String(),
+
+			Fee:       v.Fee,
+			UsdFee:    usdFee,
+			FloatFee:  floatFee.String(),
+			Timestamp: v.Timestamp,
+			Status:    v.Status,
+		})
+	}
+
+	rsByte, err := json.Marshal(responseTxs)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // substrateBalance godoc
 // @Summary Get substrateBalance by address
 // @ID getBalance
@@ -695,7 +845,7 @@ func (c *Controller) transactionStatus(w http.ResponseWriter, r *http.Request) e
 // @Param currency query int true "currency"
 // @Success 200 {object} Balance
 // @Failure 400 {string} string
-// @Router /profile/substrateBalance [get]
+// @Router /profile/substrate/balance [get]
 func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) error {
 	address := r.URL.Query().Get("address")
 	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
@@ -737,6 +887,63 @@ func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+// substrateFee godoc
+// @Summary Calculate fee for substrate tx
+// @ID substrateTxBase
+// @Tags Profile
+// @Accept  json
+// @Produce json
+// @Param sender query string true "sender"
+// @Param receiver query string true "receiver"
+// @Param currency query int true "currency"
+// @Param value query string true "value"
+// @Success 200 {object} Balance
+// @Failure 400 {string} string
+// @Router /profile/substrate/fee [get]
+func (c *Controller) substrateTxBase(w http.ResponseWriter, r *http.Request) error {
+	sender := r.URL.Query().Get("sender")
+	receiver := r.URL.Query().Get("receiver")
+	value := r.URL.Query().Get("value")
+	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
+	if err != nil {
+		return err
+	}
+
+	currency := types.Currency(currencyInt)
+
+	resp, err := http.Get(fmt.Sprintf("%s/substrate/fee/%s/%s?currency=%s&value=%s", c.txApiHost, sender, receiver, currency.String(), value))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	fee := new(FeeInfo)
+	err = json.Unmarshal(body, &fee)
+	if err != nil {
+		return err
+	}
+
+	rsByte, err := json.Marshal(fee)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // updateFirebaseToken godoc
 // @Summary Subscribe
 // @Description subscribe for notifications about transaction
@@ -744,7 +951,7 @@ func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) er
 // @Tags Notification
 // @Accept  json
 // @Produce json
-// @Param rq body UpdateTokenRq true "update token request"
+// @Param rq body UpdateFirebaseTokenRq true "update token request"
 // @Success 200
 // @Failure 400 {string} string
 // @Router /notification/subscribe [post]
@@ -780,6 +987,7 @@ func (c *Controller) updateFirebaseToken(w http.ResponseWriter, r *http.Request)
 
 	if err == db.ErrNoRows {
 		sub = &db.Subscriber{
+			Id:        db.NewId(),
 			Token:     updateTokenRq.Token,
 			ProfileId: profileId,
 			Timestamp: time.Now().Unix(),

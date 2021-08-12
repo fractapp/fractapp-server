@@ -17,7 +17,7 @@ require (
 	github.com/go-chi/render v1.0.1 // indirect
 	github.com/go-openapi/spec v0.20.3 // indirect
 	github.com/go-pg/migrations/v8 v8.0.1
-	github.com/go-pg/pg/v10 v10.7.3
+	github.com/go-pg/pg v8.0.7+incompatible // indirect
 	github.com/golang/mock v1.4.4
 	github.com/gorilla/websocket v1.4.2
 	github.com/lestrrat-go/jwx v1.0.6-0.20201127121120-26218808f029

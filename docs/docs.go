@@ -197,7 +197,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/notification.UpdateTokenRq"
+                            "$ref": "#/definitions/profile.UpdateFirebaseTokenRq"
                         }
                     }
                 ],
@@ -249,51 +249,6 @@ var doc = `{
                 }
             }
         },
-        "/profile/balance": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Profile"
-                ],
-                "summary": "Get balance by address",
-                "operationId": "getBalance",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "address",
-                        "name": "address",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "currency",
-                        "name": "currency",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/profile.Balance"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/profile/contacts": {
             "get": {
                 "security": [
@@ -320,50 +275,6 @@ var doc = `{
                             "items": {
                                 "type": "string"
                             }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/profile/info": {
-            "get": {
-                "description": "get user by id or blockchain address",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Profile"
-                ],
-                "summary": "Get user",
-                "operationId": "profileInfo",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "get user profile by user id",
-                        "name": "id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "get user profile by blockchain address",
-                        "name": "address",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/profile.ShortUserProfile"
                         }
                     },
                     "400": {
@@ -491,6 +402,110 @@ var doc = `{
                     },
                     "404": {
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/profile/substrate/balance": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get substrateBalance by address",
+                "operationId": "getBalance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "address",
+                        "name": "address",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.Balance"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/substrate/fee": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Calculate fee for substrate tx",
+                "operationId": "substrateTxBase",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sender",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "receiver",
+                        "name": "receiver",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "value",
+                        "name": "value",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.Balance"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -712,6 +727,45 @@ var doc = `{
                 }
             }
         },
+        "/profile/userInfo": {
+            "get": {
+                "description": "get user by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get user",
+                "operationId": "profileInfo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "get user profile by user id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.ShortUserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/profile/username": {
             "get": {
                 "consumes": [
@@ -803,13 +857,6 @@ var doc = `{
         "auth.SendCodeRq": {
             "type": "object",
             "properties": {
-                "checkType": {
-                    "description": "Now it is always zero. But in future it will have more types.",
-                    "type": "integer",
-                    "enum": [
-                        0
-                    ]
-                },
                 "type": {
                     "description": "Message type (0 - sms / 1 - email)",
                     "type": "integer",
@@ -833,49 +880,42 @@ var doc = `{
                 }
             }
         },
-        "info.TotalInfo": {
+        "info.Price": {
             "type": "object",
             "properties": {
-                "price": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
-                    }
+                "currency": {
+                    "type": "integer"
                 },
-                "substrateUrls": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "value": {
+                    "type": "number"
                 }
             }
         },
-        "notification.UpdateTokenRq": {
+        "info.SubstrateUrl": {
             "type": "object",
             "properties": {
-                "address": {
-                    "description": "Blockchain address",
-                    "type": "string"
-                },
                 "network": {
-                    "description": "network id (0 - polkadot/ 1 - kusama) from address",
                     "type": "integer"
                 },
-                "pubKey": {
-                    "description": "Public key from address",
+                "url": {
                     "type": "string"
+                }
+            }
+        },
+        "info.TotalInfo": {
+            "type": "object",
+            "properties": {
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/info.Price"
+                    }
                 },
-                "sign": {
-                    "description": "signature for message (more information here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md)",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp from message",
-                    "type": "integer"
-                },
-                "token": {
-                    "description": "firebase token",
-                    "type": "string"
+                "substrateUrls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/info.SubstrateUrl"
+                    }
                 }
             }
         },
@@ -898,7 +938,7 @@ var doc = `{
                     "type": "string"
                 },
                 "id": {
-                    "description": "id from info",
+                    "description": "id from userInfo",
                     "type": "string"
                 },
                 "isMigratory": {
@@ -906,7 +946,7 @@ var doc = `{
                     "type": "boolean"
                 },
                 "lastUpdate": {
-                    "description": "timestamp of the last info update",
+                    "description": "timestamp of the last userInfo update",
                     "type": "integer"
                 },
                 "name": {
@@ -937,11 +977,15 @@ var doc = `{
                     "type": "string"
                 },
                 "id": {
-                    "description": "id from info",
+                    "description": "id from userInfo",
                     "type": "string"
                 },
+                "isChatBot": {
+                    "description": "always false. This property is for the future",
+                    "type": "boolean"
+                },
                 "lastUpdate": {
-                    "description": "timestamp of the last info update",
+                    "description": "timestamp of the last userInfo update",
                     "type": "integer"
                 },
                 "name": {
@@ -961,13 +1005,10 @@ var doc = `{
                 "fee": {
                     "type": "string"
                 },
-                "floatFee": {
-                    "type": "string"
-                },
-                "floatValue": {
-                    "type": "string"
-                },
                 "from": {
+                    "type": "string"
+                },
+                "hash": {
                     "type": "string"
                 },
                 "id": {
@@ -982,18 +1023,6 @@ var doc = `{
                 "to": {
                     "type": "string"
                 },
-                "usdFee": {
-                    "type": "number"
-                },
-                "usdValue": {
-                    "type": "number"
-                },
-                "userFrom": {
-                    "type": "string"
-                },
-                "userTo": {
-                    "type": "string"
-                },
                 "value": {
                     "type": "string"
                 }
@@ -1004,6 +1033,14 @@ var doc = `{
             "properties": {
                 "status": {
                     "type": "integer"
+                }
+            }
+        },
+        "profile.UpdateFirebaseTokenRq": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
                 }
             }
         },

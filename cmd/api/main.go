@@ -9,12 +9,13 @@ import (
 	"fractapp-server/controller"
 	"fractapp-server/controller/auth"
 	"fractapp-server/controller/info"
+	"fractapp-server/controller/message"
 	internalMiddleware "fractapp-server/controller/middleware"
 	"fractapp-server/controller/profile"
-	"fractapp-server/controller/websocket"
 	"fractapp-server/db"
 	"fractapp-server/docs"
 	"fractapp-server/notification"
+	"fractapp-server/push"
 	"log"
 	"net/http"
 	"os"
@@ -75,8 +76,8 @@ func main() {
 
 func start(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
-
 	log.Println("Setup api service")
+
 	// parse config
 	config, err := config.Parse(configPath)
 	if err != nil {
@@ -142,6 +143,13 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 
 	authMiddleware := internalMiddleware.New(mongoDB)
 
+	notificator, err := push.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
+	if err != nil {
+		log.Fatalf("Invalid create notificator: %s", err.Error())
+		return err
+	}
+	messageController := message.NewController(mongoDB, notificator)
+
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Swagger Fractapp Server API"
 	docs.SwaggerInfo.Description = "This is Fractapp server. Authorization flow described here: https://github.com/fractapp/fractapp-server/blob/main/AUTH.md"
@@ -172,7 +180,12 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 			r.Post(profile.UpdateProfileRoute, controller.Route(pController, profile.UpdateProfileRoute))
 			r.Post(profile.UploadAvatarRoute, controller.Route(pController, profile.UploadAvatarRoute))
 			r.Post(profile.UploadContactsRoute, controller.Route(pController, profile.UploadContactsRoute))
+		})
 
+		r.Route(messageController.MainRoute(), func(r chi.Router) {
+			r.Get(message.UnreadRoute, controller.Route(messageController, message.UnreadRoute))
+			r.Post(message.SendRoute, controller.Route(messageController, message.SendRoute))
+			r.Post(message.ReadRoute, controller.Route(messageController, message.ReadRoute))
 		})
 	})
 
@@ -184,11 +197,12 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Get(pController.MainRoute()+profile.UserInfoRoute, controller.Route(pController, profile.UserInfoRoute))
 		r.Get(pController.MainRoute()+profile.TransactionStatusRoute, controller.Route(pController, profile.TransactionStatusRoute))
 		r.Get(pController.MainRoute()+profile.SubstrateBalanceRoute, controller.Route(pController, profile.SubstrateBalanceRoute))
+		r.Get(pController.MainRoute()+profile.TransactionsRoute, controller.Route(pController, profile.TransactionsRoute))
+		r.Get(pController.MainRoute()+profile.SubstrateFeeRoute, controller.Route(pController, profile.SubstrateFeeRoute))
+
 		r.Get(infoController.MainRoute()+info.TotalRoute, controller.Route(infoController, info.TotalRoute))
 
 		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
-
-		r.Get("/connect", websocket.CreateConnectRoute(tokenAuth, authMiddleware, mongoDB))
 	})
 
 	srv := &http.Server{
