@@ -13,6 +13,7 @@ import (
 	internalMiddleware "fractapp-server/controller/middleware"
 	notificationController "fractapp-server/controller/notification"
 	"fractapp-server/controller/profile"
+	"fractapp-server/controller/substrate"
 	"fractapp-server/db"
 	"fractapp-server/docs"
 	"fractapp-server/notification"
@@ -123,6 +124,7 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 
 	nController := notificationController.NewController(pgDb)
 	pController := profile.NewController(pgDb, config.TransactionApi)
+	substrateController := substrate.NewController(pgDb, config.TransactionApi)
 	authController := auth.NewController(
 		pgDb,
 		twilioApi,
@@ -177,6 +179,10 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Get(infoController.MainRoute()+info.TotalRoute, controller.Route(infoController, info.TotalRoute))
 
 		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
+
+		r.Get(substrateController.MainRoute()+substrate.FeeRoute, controller.Route(substrateController, substrate.FeeRoute))
+		r.Get(substrateController.MainRoute()+substrate.BaseRoute, controller.Route(substrateController, substrate.BaseRoute))
+		r.Post(substrateController.MainRoute()+substrate.BroadcastRoute, controller.Route(substrateController, substrate.BroadcastRoute))
 
 		r.Route(nController.MainRoute(), func(r chi.Router) {
 			r.Post(notificationController.SubscribeRoute, controller.Route(nController, notificationController.SubscribeRoute))

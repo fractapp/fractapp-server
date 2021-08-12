@@ -249,51 +249,6 @@ var doc = `{
                 }
             }
         },
-        "/profile/balance": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Profile"
-                ],
-                "summary": "Get balance by address",
-                "operationId": "getBalance",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "address",
-                        "name": "address",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "currency",
-                        "name": "currency",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/profile.Balance"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/profile/contacts": {
             "get": {
                 "security": [
@@ -320,50 +275,6 @@ var doc = `{
                             "items": {
                                 "type": "string"
                             }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/profile/info": {
-            "get": {
-                "description": "get user by id or blockchain address",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Profile"
-                ],
-                "summary": "Get user",
-                "operationId": "profileInfo",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "get user profile by user id",
-                        "name": "id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "get user profile by blockchain address",
-                        "name": "address",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/profile.ShortUserProfile"
                         }
                     },
                     "400": {
@@ -491,6 +402,51 @@ var doc = `{
                     },
                     "404": {
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/profile/substrateBalance": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get substrateBalance by address",
+                "operationId": "getBalance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "address",
+                        "name": "address",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.Balance"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -712,6 +668,45 @@ var doc = `{
                 }
             }
         },
+        "/profile/userInfo": {
+            "get": {
+                "description": "get user by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get user",
+                "operationId": "profileInfo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "get user profile by user id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profile.ShortUserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/profile/username": {
             "get": {
                 "consumes": [
@@ -746,6 +741,105 @@ var doc = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/substrate/base": {
+            "get": {
+                "description": "broadcast transaction",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "broadcast transaction",
+                "operationId": "broadcast",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sender",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.BroadcastResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/substrate/fee": {
+            "get": {
+                "description": "calculate fee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "Calculate fee",
+                "operationId": "fee",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sender",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "receiver",
+                        "name": "receiver",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "value",
+                        "name": "value",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.FeeInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
@@ -833,19 +927,41 @@ var doc = `{
                 }
             }
         },
+        "info.Price": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "info.SubstrateUrl": {
+            "type": "object",
+            "properties": {
+                "network": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "info.TotalInfo": {
             "type": "object",
             "properties": {
-                "price": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/info.Price"
                     }
                 },
                 "substrateUrls": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/info.SubstrateUrl"
                     }
                 }
             }
@@ -898,7 +1014,7 @@ var doc = `{
                     "type": "string"
                 },
                 "id": {
-                    "description": "id from info",
+                    "description": "id from userInfo",
                     "type": "string"
                 },
                 "isMigratory": {
@@ -906,7 +1022,7 @@ var doc = `{
                     "type": "boolean"
                 },
                 "lastUpdate": {
-                    "description": "timestamp of the last info update",
+                    "description": "timestamp of the last userInfo update",
                     "type": "integer"
                 },
                 "name": {
@@ -937,11 +1053,11 @@ var doc = `{
                     "type": "string"
                 },
                 "id": {
-                    "description": "id from info",
+                    "description": "id from userInfo",
                     "type": "string"
                 },
                 "lastUpdate": {
-                    "description": "timestamp of the last info update",
+                    "description": "timestamp of the last userInfo update",
                     "type": "integer"
                 },
                 "name": {
@@ -968,6 +1084,9 @@ var doc = `{
                     "type": "string"
                 },
                 "from": {
+                    "type": "string"
+                },
+                "hash": {
                     "type": "string"
                 },
                 "id": {
@@ -1015,6 +1134,48 @@ var doc = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "substrate.BroadcastResult": {
+            "type": "object",
+            "properties": {
+                "hash": {
+                    "type": "integer"
+                }
+            }
+        },
+        "substrate.FeeInfo": {
+            "type": "object",
+            "properties": {
+                "fee": {
+                    "type": "integer"
+                }
+            }
+        },
+        "substrate.TxBase": {
+            "type": "object",
+            "properties": {
+                "blockHash": {
+                    "type": "string"
+                },
+                "fee": {
+                    "type": "string"
+                },
+                "genesisHash": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "nonce": {
+                    "type": "integer"
+                },
+                "specVersion": {
+                    "type": "integer"
+                },
+                "transactionVersion": {
+                    "type": "integer"
                 }
             }
         }
