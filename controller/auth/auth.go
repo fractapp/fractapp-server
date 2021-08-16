@@ -29,7 +29,7 @@ const (
 	MaxWrongCodeAttempts = 3
 
 	SendCodeRoute = "/sendCode"
-	SignInRoute   = "/signIn"
+	SignInRoute   = "/signin"
 )
 
 var (
@@ -201,7 +201,7 @@ func (c *Controller) sendCode(w http.ResponseWriter, r *http.Request) error {
 // @Failure 403 {string} string AddressExistErr
 // @Failure 403 {string} string AccountExistErr
 // @Failure 400 {string} string
-// @Router /auth/signIn [post]
+// @Router /auth/signin [post]
 func (c *Controller) signIn(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {

@@ -15,7 +15,7 @@ Auth-Key: Auth Public Key in hex format
 ## Sign in Fractapp
 
 When a user wants authorization in fractapp then the user needs to use a code for confirmation that received on email or phone number.
-User needs to create request to /auth/signIn:
+User needs to create request to /auth/signin:
 ```
 {
     "Value": "",        // Email address or Phone number
