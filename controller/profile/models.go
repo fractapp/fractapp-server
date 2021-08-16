@@ -30,14 +30,6 @@ type TxStatusRs struct {
 	Status int64 `json:"status"`
 }
 
-type Balance struct {
-	Value string `json:"value"`
-}
-
-type FeeInfo struct {
-	Fee string `json:"fee"`
-}
-
 type MyContacts map[string]ShortUserProfile // map with id->short user userInfo
 
 type UpdateFirebaseTokenRq struct {

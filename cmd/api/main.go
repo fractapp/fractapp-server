@@ -12,6 +12,7 @@ import (
 	"fractapp-server/controller/message"
 	internalMiddleware "fractapp-server/controller/middleware"
 	"fractapp-server/controller/profile"
+	"fractapp-server/controller/substrate"
 	"fractapp-server/db"
 	"fractapp-server/docs"
 	"fractapp-server/notification"
@@ -133,6 +134,8 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		config.SMSService.AccountSid, config.SMSService.AuthToken)
 
 	pController := profile.NewController(mongoDB, config.TransactionApi)
+	substrateController := substrate.NewController(mongoDB, config.TransactionApi)
+
 	authController := auth.NewController(
 		mongoDB,
 		twilioApi,
@@ -196,13 +199,16 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Get(pController.MainRoute()+profile.SearchRoute, controller.Route(pController, profile.SearchRoute))
 		r.Get(pController.MainRoute()+profile.UserInfoRoute, controller.Route(pController, profile.UserInfoRoute))
 		r.Get(pController.MainRoute()+profile.TransactionStatusRoute, controller.Route(pController, profile.TransactionStatusRoute))
-		r.Get(pController.MainRoute()+profile.SubstrateBalanceRoute, controller.Route(pController, profile.SubstrateBalanceRoute))
 		r.Get(pController.MainRoute()+profile.TransactionsRoute, controller.Route(pController, profile.TransactionsRoute))
-		r.Get(pController.MainRoute()+profile.SubstrateFeeRoute, controller.Route(pController, profile.SubstrateFeeRoute))
 
 		r.Get(infoController.MainRoute()+info.TotalRoute, controller.Route(infoController, info.TotalRoute))
 
 		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
+
+		r.Get(substrateController.MainRoute()+substrate.FeeRoute, controller.Route(substrateController, substrate.FeeRoute))
+		r.Get(substrateController.MainRoute()+substrate.BaseRoute, controller.Route(substrateController, substrate.BaseRoute))
+		r.Post(substrateController.MainRoute()+substrate.BroadcastRoute, controller.Route(substrateController, substrate.BroadcastRoute))
+		r.Get(substrateController.MainRoute()+substrate.BalanceRoute, controller.Route(substrateController, substrate.BalanceRoute))
 	})
 
 	srv := &http.Server{

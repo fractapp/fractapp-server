@@ -34,11 +34,9 @@ const (
 	MyMatchContactsRoute     = "/matchContacts"
 	UserInfoRoute            = "/userInfo"
 	AvatarRoute              = "/avatar"
-	SubstrateBalanceRoute    = "/substrate/balance"
 	TransactionStatusRoute   = "/transaction/status"
 	TransactionsRoute        = "/transactions"
 	UpdateFirebaseTokenRoute = "/firebase"
-	SubstrateFeeRoute        = "/substrate/fee"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -97,16 +95,12 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.userInfo, nil
 	case AvatarRoute:
 		return c.avatar, nil
-	case SubstrateBalanceRoute:
-		return c.substrateBalance, nil
 	case TransactionStatusRoute:
 		return c.transactionStatus, nil
 	case UpdateFirebaseTokenRoute:
 		return c.updateFirebaseToken, nil
 	case TransactionsRoute:
 		return c.transactions, nil
-	case SubstrateFeeRoute:
-		return c.substrateTxBase, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -824,115 +818,6 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	rsByte, err := json.Marshal(responseTxs)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(rsByte)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// substrateBalance godoc
-// @Summary Get substrateBalance by address
-// @ID getBalance
-// @Tags Profile
-// @Accept  json
-// @Produce json
-// @Param address query string true "address"
-// @Param currency query int true "currency"
-// @Success 200 {object} Balance
-// @Failure 400 {string} string
-// @Router /profile/substrate/balance [get]
-func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) error {
-	address := r.URL.Query().Get("address")
-	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
-	if err != nil {
-		return err
-	}
-	currency := types.Currency(currencyInt)
-
-	resp, err := http.Get(fmt.Sprintf("%s/substrate/balance/%s?currency=%s", c.txApiHost, address, currency.String()))
-	if err != nil {
-		return InvalidConnectionTxApiErr
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return InvalidConnectionTxApiErr
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	balance := new(Balance)
-	err = json.Unmarshal(body, &balance)
-	if err != nil {
-		return err
-	}
-
-	rsByte, err := json.Marshal(balance)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(rsByte)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// substrateFee godoc
-// @Summary Calculate fee for substrate tx
-// @ID substrateTxBase
-// @Tags Profile
-// @Accept  json
-// @Produce json
-// @Param sender query string true "sender"
-// @Param receiver query string true "receiver"
-// @Param currency query int true "currency"
-// @Param value query string true "value"
-// @Success 200 {object} Balance
-// @Failure 400 {string} string
-// @Router /profile/substrate/fee [get]
-func (c *Controller) substrateTxBase(w http.ResponseWriter, r *http.Request) error {
-	sender := r.URL.Query().Get("sender")
-	receiver := r.URL.Query().Get("receiver")
-	value := r.URL.Query().Get("value")
-	currencyInt, err := strconv.ParseInt(r.URL.Query().Get("currency"), 10, 32)
-	if err != nil {
-		return err
-	}
-
-	currency := types.Currency(currencyInt)
-
-	resp, err := http.Get(fmt.Sprintf("%s/substrate/fee/%s/%s?currency=%s&value=%s", c.txApiHost, sender, receiver, currency.String(), value))
-	if err != nil {
-		return InvalidConnectionTxApiErr
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return InvalidConnectionTxApiErr
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	fee := new(FeeInfo)
-	err = json.Unmarshal(body, &fee)
-	if err != nil {
-		return err
-	}
-
-	rsByte, err := json.Marshal(fee)
 	if err != nil {
 		return err
 	}

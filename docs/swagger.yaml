@@ -49,6 +49,26 @@ definitions:
         description: JWT token
         type: string
     type: object
+  db.Button:
+    properties:
+      action:
+        type: string
+      arguments:
+        items:
+          type: string
+        type: array
+      imageUrl:
+        type: string
+      value:
+        type: string
+    type: object
+  db.Row:
+    properties:
+      buttons:
+        items:
+          $ref: '#/definitions/db.Button'
+        type: array
+    type: object
   info.Price:
     properties:
       currency:
@@ -74,10 +94,60 @@ definitions:
           $ref: '#/definitions/info.SubstrateUrl'
         type: array
     type: object
-  profile.Balance:
+  message.MessageRq:
     properties:
+      action:
+        type: string
+      args:
+        items:
+          type: string
+        type: array
+      receiver:
+        type: string
+      rows:
+        items:
+          $ref: '#/definitions/db.Row'
+        type: array
       value:
         type: string
+      version:
+        type: integer
+    type: object
+  message.MessageRs:
+    properties:
+      action:
+        type: string
+      args:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      receiver:
+        type: string
+      rows:
+        items:
+          $ref: '#/definitions/db.Row'
+        type: array
+      sender:
+        type: string
+      timestamp:
+        type: integer
+      value:
+        type: string
+      version:
+        type: integer
+    type: object
+  message.MessagesAndUsersRs:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/message.MessageRs'
+        type: array
+      users:
+        additionalProperties:
+          $ref: '#/definitions/profile.ShortUserProfile'
+        type: object
     type: object
   profile.MyProfile:
     properties:
@@ -166,6 +236,38 @@ definitions:
       username:
         type: string
     type: object
+  substrate.Balance:
+    properties:
+      value:
+        type: string
+    type: object
+  substrate.BroadcastResult:
+    properties:
+      hash:
+        type: string
+    type: object
+  substrate.FeeInfo:
+    properties:
+      fee:
+        type: string
+    type: object
+  substrate.TxBase:
+    properties:
+      blockHash:
+        type: string
+      blockNumber:
+        type: integer
+      genesisHash:
+        type: string
+      metadata:
+        type: string
+      nonce:
+        type: integer
+      specVersion:
+        type: integer
+      transactionVersion:
+        type: integer
+    type: object
 info:
   contact:
     email: support@fractapp.com
@@ -208,7 +310,7 @@ paths:
       summary: Send code
       tags:
       - Authorization
-  /auth/signIn:
+  /auth/signin:
     post:
       consumes:
       - application/json
@@ -267,6 +369,51 @@ paths:
       summary: Get total info
       tags:
       - Info
+  /message/read:
+    post:
+      consumes:
+      - application/json
+      description: send message
+      operationId: read
+      parameters:
+      - description: send message body
+        in: body
+        name: rq
+        required: true
+        schema:
+          $ref: '#/definitions/message.MessageRq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: send message
+      tags:
+      - Message
+  /message/unread:
+    get:
+      consumes:
+      - application/json
+      description: get unread messages
+      operationId: unread
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/message.MessagesAndUsersRs'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Unread messages
+      tags:
+      - Message
   /notification/subscribe:
     post:
       consumes:
@@ -438,54 +585,14 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/profile.Balance'
+            $ref: '#/definitions/substrate.Balance'
         "400":
           description: Bad Request
           schema:
             type: string
       summary: Get substrateBalance by address
       tags:
-      - Profile
-  /profile/substrate/fee:
-    get:
-      consumes:
-      - application/json
-      operationId: substrateTxBase
-      parameters:
-      - description: sender
-        in: query
-        name: sender
-        required: true
-        type: string
-      - description: receiver
-        in: query
-        name: receiver
-        required: true
-        type: string
-      - description: currency
-        in: query
-        name: currency
-        required: true
-        type: integer
-      - description: value
-        in: query
-        name: value
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/profile.Balance'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-      summary: Calculate fee for substrate tx
-      tags:
-      - Profile
+      - Substrate
   /profile/transaction/status:
     get:
       consumes:
@@ -678,6 +785,104 @@ paths:
       summary: Is username exist?
       tags:
       - Profile
+  /substrate/base:
+    get:
+      consumes:
+      - application/json
+      description: calculate fee
+      operationId: txBase
+      parameters:
+      - description: sender
+        in: query
+        name: sender
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/substrate.TxBase'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get tx base
+      tags:
+      - Substrate
+  /substrate/broadcast:
+    post:
+      consumes:
+      - application/json
+      description: broadcast transaction
+      operationId: broadcast
+      parameters:
+      - description: tx
+        in: query
+        name: tx
+        required: true
+        type: string
+      - description: currency
+        in: query
+        name: currency
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/substrate.BroadcastResult'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: broadcast transaction
+      tags:
+      - Substrate
+  /substrate/fee:
+    get:
+      consumes:
+      - application/json
+      description: calculate fee
+      operationId: fee
+      parameters:
+      - description: sender
+        in: query
+        name: sender
+        required: true
+        type: string
+      - description: receiver
+        in: query
+        name: receiver
+        required: true
+        type: string
+      - description: value
+        in: query
+        name: value
+        required: true
+        type: string
+      - description: currency
+        in: query
+        name: currency
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/substrate.FeeInfo'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Calculate fee
+      tags:
+      - Substrate
 securityDefinitions:
   AuthWithJWT:
     in: header

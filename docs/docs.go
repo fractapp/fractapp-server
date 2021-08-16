@@ -82,7 +82,7 @@ var doc = `{
                 }
             }
         },
-        "/auth/signIn": {
+        "/auth/signin": {
             "post": {
                 "security": [
                     {
@@ -165,6 +165,74 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/info.TotalInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/message/read": {
+            "post": {
+                "description": "send message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Message"
+                ],
+                "summary": "send message",
+                "operationId": "read",
+                "parameters": [
+                    {
+                        "description": "send message body",
+                        "name": "rq",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/message.MessageRq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/message/unread": {
+            "get": {
+                "description": "get unread messages",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Message"
+                ],
+                "summary": "Unread messages",
+                "operationId": "unread",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/message.MessagesAndUsersRs"
                         }
                     },
                     "400": {
@@ -415,7 +483,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Profile"
+                    "Substrate"
                 ],
                 "summary": "Get substrateBalance by address",
                 "operationId": "getBalance",
@@ -439,66 +507,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/profile.Balance"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/profile/substrate/fee": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Profile"
-                ],
-                "summary": "Calculate fee for substrate tx",
-                "operationId": "substrateTxBase",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "sender",
-                        "name": "sender",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "receiver",
-                        "name": "receiver",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "currency",
-                        "name": "currency",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "value",
-                        "name": "value",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/profile.Balance"
+                            "$ref": "#/definitions/substrate.Balance"
                         }
                     },
                     "400": {
@@ -806,6 +815,151 @@ var doc = `{
                     }
                 }
             }
+        },
+        "/substrate/base": {
+            "get": {
+                "description": "calculate fee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "Get tx base",
+                "operationId": "txBase",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sender",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.TxBase"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/substrate/broadcast": {
+            "post": {
+                "description": "broadcast transaction",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "broadcast transaction",
+                "operationId": "broadcast",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "tx",
+                        "name": "tx",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.BroadcastResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/substrate/fee": {
+            "get": {
+                "description": "calculate fee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "Calculate fee",
+                "operationId": "fee",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sender",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "receiver",
+                        "name": "receiver",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "value",
+                        "name": "value",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "currency",
+                        "name": "currency",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.FeeInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -880,6 +1034,37 @@ var doc = `{
                 }
             }
         },
+        "db.Button": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "arguments": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "imageUrl": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.Row": {
+            "type": "object",
+            "properties": {
+                "buttons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.Button"
+                    }
+                }
+            }
+        },
         "info.Price": {
             "type": "object",
             "properties": {
@@ -919,11 +1104,87 @@ var doc = `{
                 }
             }
         },
-        "profile.Balance": {
+        "message.MessageRq": {
             "type": "object",
             "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "args": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "receiver": {
+                    "type": "string"
+                },
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.Row"
+                    }
+                },
                 "value": {
                     "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "message.MessageRs": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "args": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "receiver": {
+                    "type": "string"
+                },
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.Row"
+                    }
+                },
+                "sender": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "message.MessagesAndUsersRs": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/message.MessageRs"
+                    }
+                },
+                "users": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/profile.ShortUserProfile"
+                    }
                 }
             }
         },
@@ -1052,6 +1313,56 @@ var doc = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "substrate.Balance": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "substrate.BroadcastResult": {
+            "type": "object",
+            "properties": {
+                "hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "substrate.FeeInfo": {
+            "type": "object",
+            "properties": {
+                "fee": {
+                    "type": "string"
+                }
+            }
+        },
+        "substrate.TxBase": {
+            "type": "object",
+            "properties": {
+                "blockHash": {
+                    "type": "string"
+                },
+                "blockNumber": {
+                    "type": "integer"
+                },
+                "genesisHash": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "nonce": {
+                    "type": "integer"
+                },
+                "specVersion": {
+                    "type": "integer"
+                },
+                "transactionVersion": {
+                    "type": "integer"
                 }
             }
         }
