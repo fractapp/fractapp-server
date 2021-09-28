@@ -55,7 +55,7 @@ func (db *MongoDB) SearchUsersByUsername(value string, limit int64) ([]Profile, 
 
 	collection := db.collections[ProfilesDB]
 	res, err := collection.Find(db.ctx, bson.D{
-		{"username", primitive.Regex{Pattern: "/^" + value}},
+		{"username", primitive.Regex{Pattern: "^" + value}},
 	}, opt)
 	if err != nil {
 		return nil, err

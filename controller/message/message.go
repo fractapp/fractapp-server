@@ -97,6 +97,8 @@ func (c *Controller) unread(w http.ResponseWriter, r *http.Request) error {
 
 		messages = append(messages, MessageRs{
 			Id:        primitive.ObjectID(msg.Id).Hex(),
+			Args:      msg.Args,
+			Action:    Action(msg.Action),
 			Version:   msg.Version,
 			Value:     msg.Value,
 			Rows:      msg.Rows,
@@ -184,7 +186,7 @@ func (c *Controller) read(w http.ResponseWriter, r *http.Request) error {
 // @Accept  json
 // @Produce json
 // @Param rq body MessageRq true "send message body"
-// @Success 200
+// @Success 200 {object} SendInfo
 // @Failure 400 {string} string
 // @Router /message/read [post]
 func (c *Controller) send(w http.ResponseWriter, r *http.Request) error {
@@ -258,6 +260,13 @@ func (c *Controller) send(w http.ResponseWriter, r *http.Request) error {
 		if notifyErr != nil {
 			log.Errorf("Push notification error: %d \n", notifyErr)
 		}
+	}
+
+	err = controller.JSON(w, &SendInfo{
+		Timestamp: timestamp,
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil

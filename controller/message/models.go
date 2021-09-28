@@ -25,6 +25,10 @@ type MessagesAndUsersRs struct {
 	Users    map[string]profile.ShortUserProfile `json:"users"`
 }
 
+type SendInfo struct {
+	Timestamp int64 `json:"timestamp"`
+}
+
 type MessageRs struct {
 	Id string `json:"id"`
 

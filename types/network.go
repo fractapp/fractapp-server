@@ -35,21 +35,21 @@ func (n Network) Currency() Currency {
 func (n Network) String() string {
 	switch n {
 	case Polkadot:
-		return "polkadot"
+		return "Polkadot"
 	case Kusama:
-		return "kusama"
+		return "Kusama"
 	}
 
-	return "polkadot"
+	return "Polkadot"
 }
 
 func ParseNetwork(name string) (n Network) {
 	n = Polkadot
 
 	switch strings.ToLower(name) {
-	case "polkadot":
+	case "Polkadot":
 		n = Polkadot
-	case "kusama":
+	case "Kusama":
 		n = Kusama
 	}
 

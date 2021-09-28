@@ -14,7 +14,7 @@ type SendCodeRq struct {
 }
 type ConfirmAuthRq struct {
 	Value     string                       // Email address or Phone number (without +)
-	Type      notification.NotificatorType `enums:"0,1"` // Message type with code (0 - sms / 1 - email)
+	Type      notification.NotificatorType `enums:"0,1,2"` // Message type with code (0 - sms / 1 - email)
 	Addresses map[types.Network]Address    // Addresses by network (0 - polkadot/ 1 - kusama) from account
 	Code      string                       // The code that was sent
 }

@@ -36,7 +36,7 @@ const (
 	AvatarRoute              = "/avatar"
 	TransactionStatusRoute   = "/transaction/status"
 	TransactionsRoute        = "/transactions"
-	UpdateFirebaseTokenRoute = "/firebase"
+	UpdateFirebaseTokenRoute = "/firebase/update"
 
 	AvatarDir       = "/.avatars"
 	MaxAvatarSize   = 1 << 20
@@ -805,6 +805,7 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 			To:     v.To,
 			UserTo: userTo,
 
+			Action:     v.Action,
 			Value:      v.Value,
 			UsdValue:   usdValue,
 			FloatValue: floatValue.String(),
@@ -830,16 +831,16 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 }
 
 // updateFirebaseToken godoc
-// @Summary Subscribe
+// @Summary Subscribe for notifications about transaction
 // @Description subscribe for notifications about transaction
 // @ID subscribe
-// @Tags Notification
+// @Tags Profile
 // @Accept  json
 // @Produce json
 // @Param rq body UpdateFirebaseTokenRq true "update token request"
 // @Success 200
 // @Failure 400 {string} string
-// @Router /notification/subscribe [post]
+// @Router /firebase/update [post]
 func (c *Controller) updateFirebaseToken(w http.ResponseWriter, r *http.Request) error {
 	profileId := middleware.ProfileId(r)
 

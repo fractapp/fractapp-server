@@ -13,21 +13,12 @@ const (
 )
 
 type Controller struct {
-	db            db.DB
-	substrateUrls []SubstrateUrl
+	db db.DB
 }
 
-func NewController(db db.DB, substrateUrls map[string]string) *Controller {
-	urls := make([]SubstrateUrl, 0)
-	for k, v := range substrateUrls {
-		urls = append(urls, SubstrateUrl{
-			Network: types.ParseNetwork(k),
-			Url:     v,
-		})
-	}
+func NewController(db db.DB) *Controller {
 	return &Controller{
-		db:            db,
-		substrateUrls: urls,
+		db: db,
 	}
 }
 
@@ -80,8 +71,7 @@ func (c *Controller) total(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	total := &TotalInfo{
-		SubstrateUrls: c.substrateUrls,
-		Prices:        prices,
+		Prices: prices,
 	}
 	b, err := json.Marshal(&total)
 	if err != nil {

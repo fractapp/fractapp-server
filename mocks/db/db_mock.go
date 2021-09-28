@@ -9,7 +9,6 @@ import (
 	notification "fractapp-server/notification"
 	types "fractapp-server/types"
 	gomock "github.com/golang/mock/gomock"
-	primitive "go.mongodb.org/mongo-driver/bson/primitive"
 	reflect "reflect"
 )
 
@@ -66,6 +65,21 @@ func (mr *MockDBMockRecorder) AllContacts(profileId interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllContacts", reflect.TypeOf((*MockDB)(nil).AllContacts), profileId)
 }
 
+// AllMatchContacts mocks base method
+func (m *MockDB) AllMatchContacts(id db.ID) ([]db.Profile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AllMatchContacts", id)
+	ret0, _ := ret[0].([]db.Profile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AllMatchContacts indicates an expected call of AllMatchContacts
+func (mr *MockDBMockRecorder) AllMatchContacts(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllMatchContacts", reflect.TypeOf((*MockDB)(nil).AllMatchContacts), id)
+}
+
 // MessagesByReceiver mocks base method
 func (m *MockDB) MessagesByReceiver(receiver db.ID) ([]db.Message, error) {
 	m.ctrl.T.Helper()
@@ -96,18 +110,18 @@ func (mr *MockDBMockRecorder) MessagesBySenderAndReceiver(sender, receiver inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessagesBySenderAndReceiver", reflect.TypeOf((*MockDB)(nil).MessagesBySenderAndReceiver), sender, receiver)
 }
 
-// UpdateDeliveredMessage mocks base method
-func (m *MockDB) UpdateDeliveredMessage(id primitive.ObjectID) error {
+// SetDelivered mocks base method
+func (m *MockDB) SetDelivered(owner, id db.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateDeliveredMessage", id)
+	ret := m.ctrl.Call(m, "SetDelivered", owner, id)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateDeliveredMessage indicates an expected call of UpdateDeliveredMessage
-func (mr *MockDBMockRecorder) UpdateDeliveredMessage(id interface{}) *gomock.Call {
+// SetDelivered indicates an expected call of SetDelivered
+func (mr *MockDBMockRecorder) SetDelivered(owner, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDeliveredMessage", reflect.TypeOf((*MockDB)(nil).UpdateDeliveredMessage), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelivered", reflect.TypeOf((*MockDB)(nil).SetDelivered), owner, id)
 }
 
 // Prices mocks base method
@@ -168,6 +182,21 @@ func (m *MockDB) SearchUsersByEmail(email string) (*db.Profile, error) {
 func (mr *MockDBMockRecorder) SearchUsersByEmail(email interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUsersByEmail", reflect.TypeOf((*MockDB)(nil).SearchUsersByEmail), email)
+}
+
+// ProfileById mocks base method
+func (m *MockDB) ProfileById(id db.ID) (*db.Profile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProfileById", id)
+	ret0, _ := ret[0].(*db.Profile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProfileById indicates an expected call of ProfileById
+func (mr *MockDBMockRecorder) ProfileById(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProfileById", reflect.TypeOf((*MockDB)(nil).ProfileById), id)
 }
 
 // ProfileByAuthId mocks base method
@@ -290,41 +319,41 @@ func (mr *MockDBMockRecorder) SubscribersCountByToken(token interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribersCountByToken", reflect.TypeOf((*MockDB)(nil).SubscribersCountByToken), token)
 }
 
-// SubscriberById mocks base method
-func (m *MockDB) SubscriberById(id db.ID) (*db.Subscriber, error) {
+// SubscriberByProfileId mocks base method
+func (m *MockDB) SubscriberByProfileId(id db.ID) (*db.Subscriber, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubscriberById", id)
+	ret := m.ctrl.Call(m, "SubscriberByProfileId", id)
 	ret0, _ := ret[0].(*db.Subscriber)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SubscriberById indicates an expected call of SubscriberById
-func (mr *MockDBMockRecorder) SubscriberById(id interface{}) *gomock.Call {
+// SubscriberByProfileId indicates an expected call of SubscriberByProfileId
+func (mr *MockDBMockRecorder) SubscriberByProfileId(id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscriberById", reflect.TypeOf((*MockDB)(nil).SubscriberById), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscriberByProfileId", reflect.TypeOf((*MockDB)(nil).SubscriberByProfileId), id)
 }
 
-// IdByToken mocks base method
-func (m *MockDB) IdByToken(token string) (db.ID, error) {
+// TokenByValue mocks base method
+func (m *MockDB) TokenByValue(token string) (*db.Token, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IdByToken", token)
-	ret0, _ := ret[0].(db.ID)
+	ret := m.ctrl.Call(m, "TokenByValue", token)
+	ret0, _ := ret[0].(*db.Token)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IdByToken indicates an expected call of IdByToken
-func (mr *MockDBMockRecorder) IdByToken(token interface{}) *gomock.Call {
+// TokenByValue indicates an expected call of TokenByValue
+func (mr *MockDBMockRecorder) TokenByValue(token interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdByToken", reflect.TypeOf((*MockDB)(nil).IdByToken), token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TokenByValue", reflect.TypeOf((*MockDB)(nil).TokenByValue), token)
 }
 
 // TokenByProfileId mocks base method
-func (m *MockDB) TokenByProfileId(id db.ID) (string, error) {
+func (m *MockDB) TokenByProfileId(id db.ID) (*db.Token, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TokenByProfileId", id)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(*db.Token)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -364,15 +393,15 @@ func (mr *MockDBMockRecorder) InsertMany(values interface{}) *gomock.Call {
 }
 
 // UpdateByPK mocks base method
-func (m *MockDB) UpdateByPK(id db.ID, value interface{}) error {
+func (m *MockDB) UpdateByPK(Id db.ID, value interface{}) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateByPK", id, value)
+	ret := m.ctrl.Call(m, "UpdateByPK", Id, value)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateByPK indicates an expected call of UpdateByPK
-func (mr *MockDBMockRecorder) UpdateByPK(id, value interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) UpdateByPK(Id, value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateByPK", reflect.TypeOf((*MockDB)(nil).UpdateByPK), id, value)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateByPK", reflect.TypeOf((*MockDB)(nil).UpdateByPK), Id, value)
 }

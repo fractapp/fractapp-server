@@ -33,12 +33,13 @@ type TxStatusRs struct {
 type MyContacts map[string]ShortUserProfile // map with id->short user userInfo
 
 type UpdateFirebaseTokenRq struct {
-	Token string
+	Token string `json:"token"`
 }
 
 type Transaction struct {
 	ID        string `json:"id"`
 	Hash      string `json:"hash"`
+	Action    int64  `json:"action"`
 	Currency  int    `json:"currency"`
 	To        string `json:"to"`
 	From      string `json:"from"`
@@ -56,6 +57,8 @@ type TransactionRs struct {
 
 	From     string `json:"from"`
 	UserFrom string `json:"userFrom"`
+
+	Action int64 `json:"action"`
 
 	To     string `json:"to"`
 	UserTo string `json:"userTo"`
