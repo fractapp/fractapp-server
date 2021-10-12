@@ -63,13 +63,9 @@ type TransactionRs struct {
 	To     string `json:"to"`
 	UserTo string `json:"userTo"`
 
-	Value      string  `json:"value"`
-	UsdValue   float32 `json:"usdValue"`
-	FloatValue string  `json:"floatValue"`
-
-	Fee      string  `json:"fee"`
-	UsdFee   float32 `json:"usdFee"`
-	FloatFee string  `json:"floatFee"`
+	Value string  `json:"value"`
+	Fee   string  `json:"fee"`
+	Price float32 `json:"price"`
 
 	Timestamp int64 `json:"timestamp"`
 	Status    int64 `json:"status"`

@@ -206,6 +206,7 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Post(authController.MainRoute()+auth.SendCodeRoute, controller.Route(authController, auth.SendCodeRoute))
 
 		r.Get(substrateController.MainRoute()+substrate.FeeRoute, controller.Route(substrateController, substrate.FeeRoute))
+		r.Get(substrateController.MainRoute()+substrate.TransferFeeRoute, controller.Route(substrateController, substrate.TransferFeeRoute))
 		r.Get(substrateController.MainRoute()+substrate.BaseRoute, controller.Route(substrateController, substrate.BaseRoute))
 		r.Get(substrateController.MainRoute()+substrate.TxBaseRoute, controller.Route(substrateController, substrate.TxBaseRoute))
 		r.Post(substrateController.MainRoute()+substrate.BroadcastRoute, controller.Route(substrateController, substrate.BroadcastRoute))

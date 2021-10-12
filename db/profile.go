@@ -102,7 +102,7 @@ func (db *MongoDB) ProfileByUsername(username string) (*Profile, error) {
 	return p, err
 }
 func (db *MongoDB) ProfileByAddress(network types.Network, address string) (*Profile, error) {
-	p, err := db.profileBy("addresses."+strconv.FormatInt(int64(network), 10), address)
+	p, err := db.profileBy("addresses."+strconv.FormatInt(int64(network), 10)+".address", address)
 	if err != nil {
 		return nil, err
 	}
@@ -127,11 +127,11 @@ func (db *MongoDB) ProfileByEmail(email string) (*Profile, error) {
 }
 func (db *MongoDB) IsUsernameExist(username string) (bool, error) {
 	_, err := db.profileBy("username", username)
-	if err != ErrNoRows && err != nil {
+	if err != nil && err != ErrNoRows {
 		return false, err
 	}
 
-	if err != ErrNoRows {
+	if err == ErrNoRows {
 		return false, nil
 	}
 

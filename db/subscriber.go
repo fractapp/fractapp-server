@@ -25,7 +25,7 @@ func (db *MongoDB) SubscribersCountByToken(token string) (int64, error) {
 }
 
 func (db *MongoDB) SubscriberByProfileId(id ID) (*Subscriber, error) {
-	var subscriber *Subscriber
+	subscriber := new(Subscriber)
 
 	collection := db.collections[SubscribersDB]
 

@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	BroadcastRoute = "/broadcast"
-	BaseRoute      = "/base"
-	TxBaseRoute    = "/txBase"
-	FeeRoute       = "/fee"
-	BalanceRoute   = "/balance"
+	BroadcastRoute   = "/broadcast"
+	BaseRoute        = "/base"
+	TxBaseRoute      = "/txBase"
+	FeeRoute         = "/fee"
+	BalanceRoute     = "/balance"
+	TransferFeeRoute = "/transfer/fee"
 )
 
 var (
@@ -53,6 +54,8 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 		return c.broadcast, nil
 	case BalanceRoute:
 		return c.substrateBalance, nil
+	case TransferFeeRoute:
+		return c.transferFee, nil
 	}
 
 	return nil, controller.InvalidRouteErr
@@ -73,10 +76,8 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 // @Tags Substrate
 // @Accept  json
 // @Produce json
-// @Param sender query string true "sender"
-// @Param receiver query string true "receiver"
-// @Param value query string true "value"
-// @Param currency query int64 true "currency"
+// @Param tx query string true "tx"
+// @Param network query int64 true "network"
 // @Success 200 {object} FeeInfo
 // @Failure 400 {string} string
 // @Router /substrate/fee [get]
@@ -89,6 +90,68 @@ func (c *Controller) fee(w http.ResponseWriter, r *http.Request) error {
 
 	network := types.Network(networkInt)
 	resp, err := http.Get(fmt.Sprintf("%s/substrate/fee?network=%s&tx=%s", c.txApiHost, network.String(), tx))
+	if err != nil {
+		return InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	feeInfo := new(FeeInfo)
+	err = json.Unmarshal(body, &feeInfo)
+	if err != nil {
+		return err
+	}
+
+	rsByte, err := json.Marshal(feeInfo)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(rsByte)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// fee godoc
+// @Summary Calculate fee
+// @Description calculate fee
+// @ID fee
+// @Tags Substrate
+// @Accept  json
+// @Produce json
+// @Param tx query string true "tx"
+// @Param sender query string true "sender"
+// @Param receiver query string true "receiver"
+// @Param value query string true "value"
+// @Param network query int64 true "network"
+// @Param isFullBalance query string true "isFullBalance"
+// @Success 200 {object} FeeInfo
+// @Failure 400 {string} string
+// @Router /substrate/transfer/fee [get]
+func (c *Controller) transferFee(w http.ResponseWriter, r *http.Request) error {
+	sender := r.URL.Query().Get("sender")
+	receiver := r.URL.Query().Get("receiver")
+	value := r.URL.Query().Get("value")
+	isFullBalance := r.URL.Query().Get("isFullBalance")
+	networkInt, err := strconv.ParseInt(r.URL.Query().Get("network"), 10, 32)
+	if err != nil {
+		return err
+	}
+
+	network := types.Network(networkInt)
+	resp, err := http.Get(fmt.Sprintf("%s/substrate/transfer/fee?sender=%s&receiver=%s&value=%s&isFullBalance=%s&network=%s",
+		c.txApiHost, sender, receiver, value, isFullBalance, network.String()))
 	if err != nil {
 		return InvalidConnectionTxApiErr
 	}

@@ -10,19 +10,19 @@ type Row struct {
 }
 
 type Button struct {
-	Value     string   `json:"value" bson:"value"`
-	Action    string   `json:"action" bson:"action"`
-	Arguments []string `json:"arguments" bson:"arguments"`
-	ImageUrl  string   `json:"imageUrl" bson:"image_url"`
+	Value     string            `json:"value" bson:"value"`
+	Action    string            `json:"action" bson:"action"`
+	Arguments map[string]string `json:"arguments" bson:"arguments"`
+	ImageUrl  string            `json:"imageUrl" bson:"image_url"`
 }
 
 type Message struct {
-	Id      ID       `bson:"_id"`
-	Version int      `bson:"version"`
-	Action  string   `bson:"action"`
-	Value   string   `bson:"value"`
-	Args    []string `bson:"args"`
-	Rows    []Row    `bson:"rows"`
+	Id      ID                `bson:"_id"`
+	Version int               `bson:"version"`
+	Action  string            `bson:"action"`
+	Value   string            `bson:"value"`
+	Args    map[string]string `bson:"args"`
+	Rows    []Row             `bson:"rows"`
 
 	SenderId    ID    `bson:"sender_id"`   //TODO ref
 	ReceiverId  ID    `bson:"receiver_id"` //TODO ref

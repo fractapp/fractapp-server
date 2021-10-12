@@ -7,7 +7,7 @@ import (
 type Contact struct {
 	Id          ID     `bson:"_id"`
 	ProfileId   ID     `bson:"profile"`
-	PhoneNumber string `pg:"phone_number"`
+	PhoneNumber string `bson:"phone_number"`
 }
 
 func (db *MongoDB) AllContacts(profileId ID) ([]Contact, error) {
@@ -64,9 +64,9 @@ func (db *MongoDB) AllMatchContacts(id ID) ([]Profile, error) {
 	}
 
 	contacts := make([]Profile, 0)
-	usersContactsMap := make(map[ID]string)
+	usersContactsMap := make(map[string]bool)
 	for _, v := range usersContacts {
-		usersContactsMap[v.ProfileId] = v.PhoneNumber
+		usersContactsMap[v.PhoneNumber] = true
 	}
 
 	for _, v := range contactsWhoHaveUser {
@@ -74,16 +74,16 @@ func (db *MongoDB) AllMatchContacts(id ID) ([]Profile, error) {
 			continue
 		}
 
-		if _, ok := usersContactsMap[v.ProfileId]; !ok {
-			continue
-		}
-
-		profile, err := db.ProfileById(v.ProfileId)
+		contactProfile, err := db.ProfileById(v.ProfileId)
 		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := usersContactsMap[contactProfile.PhoneNumber]; !ok {
 			continue
 		}
 
-		contacts = append(contacts, *profile)
+		contacts = append(contacts, *contactProfile)
 	}
 
 	return contacts, nil

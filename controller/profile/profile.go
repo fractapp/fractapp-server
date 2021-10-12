@@ -13,7 +13,6 @@ import (
 	"fractapp-server/validators"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -582,7 +581,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 		existContactsMap[v.PhoneNumber] = true
 	}
 
-	var myContacts []db.Contact
+	var myContacts []interface{}
 	for _, v := range contacts {
 		if !validators.IsValidatePhoneNumber(v) {
 			continue
@@ -591,7 +590,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 			continue
 		}
 
-		myContacts = append(myContacts, db.Contact{
+		myContacts = append(myContacts, &db.Contact{
 			Id:          db.NewId(),
 			ProfileId:   profileId,
 			PhoneNumber: v,
@@ -599,7 +598,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 	}
 
 	if len(myContacts) > 0 {
-		err = c.db.Insert(&myContacts)
+		err = c.db.InsertMany(myContacts)
 		if err != nil {
 			return err
 		}
@@ -758,23 +757,6 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 			}
 		}
 
-		value, _ := new(big.Int).SetString(v.Value, 10)
-		fee, _ := new(big.Int).SetString(v.Fee, 10)
-
-		floatValue := currency.ConvertFromPlanck(value)
-		floatFee := currency.ConvertFromPlanck(fee)
-
-		a := currency.Accuracy()
-		aBig := new(big.Float).SetInt(big.NewInt(a))
-
-		fv, _ := new(big.Float).Mul(floatValue, aBig).Float32()
-		fv /= float32(a)
-		usdValue := price * fv
-
-		ff, _ := new(big.Float).Mul(floatFee, aBig).Float32()
-		ff /= float32(a)
-		usdFee := price * ff
-
 		userFrom := ""
 		p, err := c.db.ProfileByAddress(currency.Network(), v.From)
 		if err != nil && err != db.ErrNoRows {
@@ -805,14 +787,11 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 			To:     v.To,
 			UserTo: userTo,
 
-			Action:     v.Action,
-			Value:      v.Value,
-			UsdValue:   usdValue,
-			FloatValue: floatValue.String(),
+			Action: v.Action,
+			Value:  v.Value,
+			Price:  price,
 
 			Fee:       v.Fee,
-			UsdFee:    usdFee,
-			FloatFee:  floatFee.String(),
 			Timestamp: v.Timestamp,
 			Status:    v.Status,
 		})
