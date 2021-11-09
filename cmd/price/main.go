@@ -48,7 +48,7 @@ func init() {
 }
 
 func main() {
-	log.Info("Start price cache ...")
+	log.Info("Start price cache...")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	config, err := config.Parse(configPath)
@@ -84,7 +84,7 @@ func main() {
 		for {
 			err := startScanForCurrency(mongoDB, ctx)
 			if err != nil {
-				log.Errorf("invalid start scan: %s", err)
+				log.Errorf("invalid start scan: %s \n", err)
 				continue
 			}
 			log.Info("Wait new price")
@@ -183,7 +183,7 @@ func scan(startTime int64, endTime int64, database db.DB, ctx context.Context) e
 		return nil
 	}
 
-	log.Infof("Start insert to db ...")
+	log.Infof("Start insert to db...")
 	if pricesLen >= 100 {
 		divider := pricesLen / 10
 		chArray := make([]chan bool, 0)
@@ -218,7 +218,7 @@ func write(prices [][]interface{}, startIndex int, endIndex int, database db.DB)
 		}
 
 		price, _ := strconv.ParseFloat(v[4].(string), 32)
-		dbPrices = append(dbPrices, &db.Price{
+		dbPrices = append(dbPrices, db.Price{
 			Timestamp: timestamp,
 			Currency:  currency,
 			Price:     float32(price),
@@ -232,7 +232,7 @@ func write(prices [][]interface{}, startIndex int, endIndex int, database db.DB)
 		}
 		err := database.InsertMany(dbPrices)
 		if err != nil {
-			log.Errorf("Insert price to db (%d:%d): %s", startIndex, endIndex, err)
+			log.Errorf("Insert price to db (%d:%d): %s \n", startIndex, endIndex, err)
 		}
 		chResult <- true
 	}()

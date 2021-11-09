@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"fractapp-server/controller"
 	"fractapp-server/db"
-	"fractapp-server/mocks"
+	mocks "fractapp-server/mocks/db"
 	"fractapp-server/utils"
 	"io/ioutil"
 	"math/rand"
@@ -238,12 +238,12 @@ func TestPubKeyHandlerInvalidTimestamp(t *testing.T) {
 }
 
 func TestJWTAuthPositive(t *testing.T) {
-	token, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": authId})
+	tokenJWT, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": authId})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, token), "POST", "test", nil)
+	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, tokenJWT), "POST", "test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,14 +253,27 @@ func TestJWTAuthPositive(t *testing.T) {
 	}
 
 	ctrl := gomock.NewController(t)
-	db := mocks.NewMockDB(ctrl)
-	authMiddleware := New(db)
+	database := mocks.NewMockDB(ctrl)
+	authMiddleware := New(database)
 
-	db.EXPECT().
-		IdByToken(gomock.Eq(tokenString)).
-		Return(authId, nil).AnyTimes()
+	token := &db.Token{Id: db.NewId(), Token: tokenString, ProfileId: db.NewId()}
 
-	id, err := authMiddleware.authWithJwt(rq)
+	profile := &db.Profile{
+		Id:       token.ProfileId,
+		AuthId:   authId,
+		Username: "fractapper10",
+	}
+
+	database.EXPECT().
+		TokenByValue(gomock.Eq(tokenString)).
+		Return(token, nil).AnyTimes()
+	database.EXPECT().
+		ProfileById(token.ProfileId).
+		Return(profile, nil)
+
+	id, _, err := authMiddleware.AuthWithJwt(rq, func(r *http.Request) string {
+		return tokenString
+	})
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -269,6 +282,7 @@ func TestJWTAuthPositive(t *testing.T) {
 		t.Fatal("auth returned invalid pubKey")
 	}
 }
+
 func TestJWTAuthInvalidToken(t *testing.T) {
 	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, "asdaskdljl"), "POST", "test", nil)
 	if err != nil {
@@ -279,9 +293,12 @@ func TestJWTAuthInvalidToken(t *testing.T) {
 	db := mocks.NewMockDB(ctrl)
 	authMiddleware := New(db)
 
-	_, err = authMiddleware.authWithJwt(rq)
+	_, _, err = authMiddleware.AuthWithJwt(rq, func(r *http.Request) string {
+		return ""
+	})
 	assert.Assert(t, err == InvalidAuthErr)
 }
+
 func TestJWTAuthNegativeNotExistInDb(t *testing.T) {
 	token, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": authId})
 	if err != nil {
@@ -302,19 +319,22 @@ func TestJWTAuthNegativeNotExistInDb(t *testing.T) {
 	authMiddleware := New(mockDb)
 
 	mockDb.EXPECT().
-		IdByToken(gomock.Eq(tokenString)).
-		Return("", db.ErrNoRows).AnyTimes()
+		TokenByValue(gomock.Eq(tokenString)).
+		Return(nil, db.ErrNoRows).AnyTimes()
 
-	_, err = authMiddleware.authWithJwt(rq)
+	_, _, err = authMiddleware.AuthWithJwt(rq, func(r *http.Request) string {
+		return tokenString
+	})
 	assert.Assert(t, err == InvalidAuthErr)
 }
+
 func TestJWTAuthNegativeInvalidClaims(t *testing.T) {
-	token, tokenString, err := tokenAuth.Encode(map[string]interface{}{"notId": authId})
+	tokenJWT, tokenString, err := tokenAuth.Encode(map[string]interface{}{"notId": authId})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, token), "POST", "test", nil)
+	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, tokenJWT), "POST", "test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,14 +344,26 @@ func TestJWTAuthNegativeInvalidClaims(t *testing.T) {
 	}
 
 	ctrl := gomock.NewController(t)
-	db := mocks.NewMockDB(ctrl)
-	authMiddleware := New(db)
+	dbMock := mocks.NewMockDB(ctrl)
+	authMiddleware := New(dbMock)
 
-	db.EXPECT().
-		IdByToken(gomock.Eq(tokenString)).
-		Return(authId, nil).AnyTimes()
+	token := &db.Token{Id: db.NewId(), Token: tokenString, ProfileId: db.NewId()}
+	profile := &db.Profile{
+		Id:       token.ProfileId,
+		AuthId:   authId,
+		Username: "fractapper10",
+	}
 
-	_, err = authMiddleware.authWithJwt(rq)
+	dbMock.EXPECT().
+		TokenByValue(gomock.Eq(tokenString)).
+		Return(token, nil).AnyTimes()
+	dbMock.EXPECT().
+		ProfileById(token.ProfileId).
+		Return(profile, nil)
+
+	_, _, err = authMiddleware.AuthWithJwt(rq, func(r *http.Request) string {
+		return tokenString
+	})
 	assert.Assert(t, err == InvalidAuthErr)
 }
 
@@ -340,20 +372,31 @@ func TestJWTHandlerPositive(t *testing.T) {
 		assert.Equal(t, r.Context().Value(AuthIdKey), authId)
 	})
 
-	token, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": authId})
+	tokenJWT, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": authId})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctrl := gomock.NewController(t)
-	db := mocks.NewMockDB(ctrl)
-	authMiddleware := New(db)
+	mockDb := mocks.NewMockDB(ctrl)
+	authMiddleware := New(mockDb)
 
-	db.EXPECT().
-		IdByToken(gomock.Eq(tokenString)).
-		Return(authId, nil).AnyTimes()
+	token := &db.Token{Id: db.NewId(), Token: tokenString, ProfileId: db.NewId()}
 
-	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, token), "POST", "test", nil)
+	profile := &db.Profile{
+		Id:       token.ProfileId,
+		AuthId:   authId,
+		Username: "fractapper10",
+	}
+
+	mockDb.EXPECT().
+		TokenByValue(gomock.Eq(tokenString)).
+		Return(token, nil).AnyTimes()
+	mockDb.EXPECT().
+		ProfileById(token.ProfileId).
+		Return(profile, nil)
+
+	rq, err := http.NewRequestWithContext(context.WithValue(context.Background(), jwtauth.TokenCtxKey, tokenJWT), "POST", "test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,6 +411,7 @@ func TestJWTHandlerPositive(t *testing.T) {
 	h.ServeHTTP(w, rq)
 	assert.Equal(t, w.Code, http.StatusOK)
 }
+
 func TestJWTHandlerInvalidAuth(t *testing.T) {
 	isCalled := false
 	nH := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

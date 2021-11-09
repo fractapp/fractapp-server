@@ -23,16 +23,18 @@ type MongoRef struct {
 type ID primitive.ObjectID
 
 var (
-	ErrNoRows            = mongo.ErrNoDocuments //TODO
+	ErrNoRows            = mongo.ErrNoDocuments
 	InvalidCollectionErr = errors.New("invalid collection name")
 
-	AuthDB        name = "auth"
-	ContactsDB    name = "contacts"
-	MessagesDB    name = "messages"
-	PricesDB      name = "prices"
-	ProfilesDB    name = "profiles"
-	SubscribersDB name = "subscribers"
-	TokensDB      name = "tokens"
+	AuthDB          name = "auth"
+	ContactsDB      name = "contacts"
+	MessagesDB      name = "messages"
+	PricesDB        name = "prices"
+	ProfilesDB      name = "profiles"
+	SubscribersDB   name = "subscribers"
+	TokensDB        name = "tokens"
+	TransactionsDB  name = "transactions"
+	NotificationsDB name = "notifications"
 )
 
 type name string
@@ -43,9 +45,9 @@ type DB interface {
 	AllContacts(profileId ID) ([]Contact, error)
 	AllMatchContacts(id ID) ([]Profile, error)
 
+	MessageById(id ID) (*Message, error)
 	MessagesByReceiver(receiver ID) ([]Message, error)
 	MessagesBySenderAndReceiver(sender ID, receiver ID) ([]Message, error)
-	SetDelivered(owner ID, id ID) error
 
 	Prices(currency string, startTime int64, endTime int64) ([]Price, error)
 	LastPriceByCurrency(currency string) (*Price, error)
@@ -67,6 +69,15 @@ type DB interface {
 
 	TokenByValue(token string) (*Token, error)
 	TokenByProfileId(id ID) (*Token, error)
+
+	TransactionById(id ID) (*Transaction, error)
+	TransactionByTxIdAndOwner(txId string, owner ID) (*Transaction, error)
+	TransactionsByOwner(ownerAddress string, currency types.Currency) ([]Transaction, error)
+
+	NotificationsByUserId(userId ID) ([]Notification, error)
+	UndeliveredNotificationsByUserId(userId ID) ([]Notification, error)
+	UndeliveredNotifications(maxTimestamp int64) ([]Notification, error)
+	NotificationsByUserIdAndType(userId ID, nType NotificationType) ([]Notification, error)
 
 	Insert(value interface{}) error
 	InsertMany(values []interface{}) error
@@ -108,13 +119,15 @@ func NewMongoDB(ctx context.Context, client *mongo.Client) (*MongoDB, error) {
 	}
 
 	collections := map[name]*mongo.Collection{
-		AuthDB:        database.Collection(string(AuthDB)),
-		ContactsDB:    database.Collection(string(ContactsDB)),
-		MessagesDB:    database.Collection(string(MessagesDB)),
-		PricesDB:      database.Collection(string(PricesDB)),
-		ProfilesDB:    database.Collection(string(ProfilesDB)),
-		SubscribersDB: database.Collection(string(SubscribersDB)),
-		TokensDB:      database.Collection(string(TokensDB)),
+		AuthDB:          database.Collection(string(AuthDB)),
+		ContactsDB:      database.Collection(string(ContactsDB)),
+		MessagesDB:      database.Collection(string(MessagesDB)),
+		PricesDB:        database.Collection(string(PricesDB)),
+		ProfilesDB:      database.Collection(string(ProfilesDB)),
+		SubscribersDB:   database.Collection(string(SubscribersDB)),
+		TokensDB:        database.Collection(string(TokensDB)),
+		TransactionsDB:  database.Collection(string(TransactionsDB)),
+		NotificationsDB: database.Collection(string(NotificationsDB)),
 	}
 
 	return &MongoDB{
@@ -127,20 +140,50 @@ func NewMongoDB(ctx context.Context, client *mongo.Client) (*MongoDB, error) {
 
 func (db *MongoDB) collection(value interface{}) (*mongo.Collection, error) {
 	switch value.(type) {
+	case Auth:
+		return db.collections[AuthDB], nil
 	case *Auth:
 		return db.collections[AuthDB], nil
+
+	case Contact:
+		return db.collections[ContactsDB], nil
 	case *Contact:
 		return db.collections[ContactsDB], nil
+
+	case Message:
+		return db.collections[MessagesDB], nil
 	case *Message:
 		return db.collections[MessagesDB], nil
+
+	case Price:
+		return db.collections[PricesDB], nil
 	case *Price:
 		return db.collections[PricesDB], nil
+
+	case Profile:
+		return db.collections[ProfilesDB], nil
 	case *Profile:
 		return db.collections[ProfilesDB], nil
+
+	case Subscriber:
+		return db.collections[SubscribersDB], nil
 	case *Subscriber:
 		return db.collections[SubscribersDB], nil
+
+	case Token:
+		return db.collections[TokensDB], nil
 	case *Token:
 		return db.collections[TokensDB], nil
+
+	case Transaction:
+		return db.collections[TransactionsDB], nil
+	case *Transaction:
+		return db.collections[TransactionsDB], nil
+
+	case Notification:
+		return db.collections[NotificationsDB], nil
+	case *Notification:
+		return db.collections[NotificationsDB], nil
 	default:
 		return nil, InvalidCollectionErr
 	}

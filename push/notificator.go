@@ -22,8 +22,7 @@ const (
 
 type Notificator interface {
 	Notify(title string, msg string, token string) error
-	MsgForAuthed(txType TxType, amount float64, currency types.Currency) string
-	MsgForAddress(address string, txType TxType, amount float64, currency types.Currency) string
+	CreateMsg(txType TxType, amount float64, usdAmount float64, currency types.Currency) string
 }
 
 type Client struct {
@@ -68,23 +67,16 @@ func (n *Client) Notify(title string, msg string, token string) error {
 	}
 	return nil
 }
-func (n *Client) MsgForAuthed(txType TxType, amount float64, currency types.Currency) string {
-	switch txType {
-	case Sent:
-		return fmt.Sprintf("You sent %.3f %s", amount, currency.String())
-	case Received:
-		return fmt.Sprintf("You received %.3f %s", amount, currency.String())
+func (n *Client) CreateMsg(txType TxType, amount float64, usdAmount float64, currency types.Currency) string {
+	amountMsg := fmt.Sprintf("%.2f (%.4f %s)", usdAmount, amount, currency.String())
+	if usdAmount/100 < 1 {
+		amountMsg = fmt.Sprintf("%.4f %s", amount, currency.String())
 	}
-
-	return ""
-}
-
-func (n *Client) MsgForAddress(address string, txType TxType, amount float64, currency types.Currency) string {
 	switch txType {
 	case Sent:
-		return fmt.Sprintf("You sent %.3f %s to %s", amount, currency.String(), address)
+		return fmt.Sprintf("You sent $%s", amountMsg)
 	case Received:
-		return fmt.Sprintf("You received %.3f %s from %s", amount, currency.String(), address)
+		return fmt.Sprintf("You received $%s", amountMsg)
 	}
 
 	return ""

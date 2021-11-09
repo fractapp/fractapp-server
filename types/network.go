@@ -1,8 +1,6 @@
 package types
 
 import (
-	"strings"
-
 	"github.com/btcsuite/btcutil/base58"
 	"golang.org/x/crypto/blake2b"
 )
@@ -46,7 +44,7 @@ func (n Network) String() string {
 func ParseNetwork(name string) (n Network) {
 	n = Polkadot
 
-	switch strings.ToLower(name) {
+	switch name {
 	case "Polkadot":
 		n = Polkadot
 	case "Kusama":

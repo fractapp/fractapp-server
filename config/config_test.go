@@ -13,10 +13,9 @@ func TestParse(t *testing.T) {
 	}
 
 	assert.DeepEqual(t, *config, Config{
-		SubstrateUrls: map[string]string{
-			"Polkadot": "polkadotUrlTest",
-			"Kusama":   "kusamaUrlTest",
-		},
+		TransactionApi:     "txApi",
+		BinanceApi:         "binanceApi",
+		DBConnectionString: "dbConnection",
 		SMSService: SMSService{
 			FromNumber: "number",
 			AccountSid: "sid",
@@ -24,12 +23,6 @@ func TestParse(t *testing.T) {
 		},
 		Firebase: Firebase{
 			ProjectId: "projectId",
-		},
-		DB: DB{
-			Host:     "host",
-			User:     "user",
-			Password: "password",
-			Database: "database",
 		},
 		Secret: "secret",
 		SMTP: SMTP{

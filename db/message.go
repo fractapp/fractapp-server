@@ -24,10 +24,29 @@ type Message struct {
 	Args    map[string]string `bson:"args"`
 	Rows    []Row             `bson:"rows"`
 
-	SenderId    ID    `bson:"sender_id"`   //TODO ref
-	ReceiverId  ID    `bson:"receiver_id"` //TODO ref
-	Timestamp   int64 `bson:"timestamp"`
-	IsDelivered bool  `bson:"is_delivered"`
+	SenderId   ID    `bson:"sender_id"`   //TODO ref
+	ReceiverId ID    `bson:"receiver_id"` //TODO ref
+	Timestamp  int64 `bson:"timestamp"`
+}
+
+func (db *MongoDB) MessageById(id ID) (*Message, error) {
+	msg := &Message{}
+
+	collection := db.collections[MessagesDB]
+	res := collection.FindOne(db.ctx, bson.D{
+		{"_id", id},
+	})
+	err := res.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Decode(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, err
 }
 
 func (db *MongoDB) MessagesByReceiver(receiver ID) ([]Message, error) {
@@ -52,22 +71,6 @@ func (db *MongoDB) MessagesByReceiver(receiver ID) ([]Message, error) {
 	}
 
 	return messages, nil
-}
-
-func (db *MongoDB) SetDelivered(owner ID, id ID) error {
-	collection := db.collections[MessagesDB]
-
-	_, err := collection.UpdateOne(db.ctx, bson.D{
-		{"_id", id},
-		{"receiver_id", owner},
-	}, bson.D{
-		{"$set", bson.D{{"is_delivered", true}}},
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (db *MongoDB) MessagesBySenderAndReceiver(sender ID, receiver ID) ([]Message, error) {

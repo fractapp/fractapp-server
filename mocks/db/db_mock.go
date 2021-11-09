@@ -80,6 +80,21 @@ func (mr *MockDBMockRecorder) AllMatchContacts(id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllMatchContacts", reflect.TypeOf((*MockDB)(nil).AllMatchContacts), id)
 }
 
+// MessageById mocks base method
+func (m *MockDB) MessageById(id db.ID) (*db.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MessageById", id)
+	ret0, _ := ret[0].(*db.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MessageById indicates an expected call of MessageById
+func (mr *MockDBMockRecorder) MessageById(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageById", reflect.TypeOf((*MockDB)(nil).MessageById), id)
+}
+
 // MessagesByReceiver mocks base method
 func (m *MockDB) MessagesByReceiver(receiver db.ID) ([]db.Message, error) {
 	m.ctrl.T.Helper()
@@ -108,20 +123,6 @@ func (m *MockDB) MessagesBySenderAndReceiver(sender, receiver db.ID) ([]db.Messa
 func (mr *MockDBMockRecorder) MessagesBySenderAndReceiver(sender, receiver interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessagesBySenderAndReceiver", reflect.TypeOf((*MockDB)(nil).MessagesBySenderAndReceiver), sender, receiver)
-}
-
-// SetDelivered mocks base method
-func (m *MockDB) SetDelivered(owner, id db.ID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetDelivered", owner, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetDelivered indicates an expected call of SetDelivered
-func (mr *MockDBMockRecorder) SetDelivered(owner, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelivered", reflect.TypeOf((*MockDB)(nil).SetDelivered), owner, id)
 }
 
 // Prices mocks base method
@@ -362,6 +363,111 @@ func (m *MockDB) TokenByProfileId(id db.ID) (*db.Token, error) {
 func (mr *MockDBMockRecorder) TokenByProfileId(id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TokenByProfileId", reflect.TypeOf((*MockDB)(nil).TokenByProfileId), id)
+}
+
+// TransactionById mocks base method
+func (m *MockDB) TransactionById(id db.ID) (*db.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransactionById", id)
+	ret0, _ := ret[0].(*db.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransactionById indicates an expected call of TransactionById
+func (mr *MockDBMockRecorder) TransactionById(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionById", reflect.TypeOf((*MockDB)(nil).TransactionById), id)
+}
+
+// TransactionByTxIdAndOwner mocks base method
+func (m *MockDB) TransactionByTxIdAndOwner(txId string, owner db.ID) (*db.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransactionByTxIdAndOwner", txId, owner)
+	ret0, _ := ret[0].(*db.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransactionByTxIdAndOwner indicates an expected call of TransactionByTxIdAndOwner
+func (mr *MockDBMockRecorder) TransactionByTxIdAndOwner(txId, owner interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionByTxIdAndOwner", reflect.TypeOf((*MockDB)(nil).TransactionByTxIdAndOwner), txId, owner)
+}
+
+// TransactionsByOwner mocks base method
+func (m *MockDB) TransactionsByOwner(ownerAddress string, currency types.Currency) ([]db.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransactionsByOwner", ownerAddress, currency)
+	ret0, _ := ret[0].([]db.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransactionsByOwner indicates an expected call of TransactionsByOwner
+func (mr *MockDBMockRecorder) TransactionsByOwner(ownerAddress, currency interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionsByOwner", reflect.TypeOf((*MockDB)(nil).TransactionsByOwner), ownerAddress, currency)
+}
+
+// NotificationsByUserId mocks base method
+func (m *MockDB) NotificationsByUserId(userId db.ID) ([]db.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NotificationsByUserId", userId)
+	ret0, _ := ret[0].([]db.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NotificationsByUserId indicates an expected call of NotificationsByUserId
+func (mr *MockDBMockRecorder) NotificationsByUserId(userId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotificationsByUserId", reflect.TypeOf((*MockDB)(nil).NotificationsByUserId), userId)
+}
+
+// UndeliveredNotificationsByUserId mocks base method
+func (m *MockDB) UndeliveredNotificationsByUserId(userId db.ID) ([]db.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UndeliveredNotificationsByUserId", userId)
+	ret0, _ := ret[0].([]db.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UndeliveredNotificationsByUserId indicates an expected call of UndeliveredNotificationsByUserId
+func (mr *MockDBMockRecorder) UndeliveredNotificationsByUserId(userId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndeliveredNotificationsByUserId", reflect.TypeOf((*MockDB)(nil).UndeliveredNotificationsByUserId), userId)
+}
+
+// UndeliveredNotifications mocks base method
+func (m *MockDB) UndeliveredNotifications(maxTimestamp int64) ([]db.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UndeliveredNotifications", maxTimestamp)
+	ret0, _ := ret[0].([]db.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UndeliveredNotifications indicates an expected call of UndeliveredNotifications
+func (mr *MockDBMockRecorder) UndeliveredNotifications(maxTimestamp interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndeliveredNotifications", reflect.TypeOf((*MockDB)(nil).UndeliveredNotifications), maxTimestamp)
+}
+
+// NotificationsByUserIdAndType mocks base method
+func (m *MockDB) NotificationsByUserIdAndType(userId db.ID, nType db.NotificationType) ([]db.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NotificationsByUserIdAndType", userId, nType)
+	ret0, _ := ret[0].([]db.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NotificationsByUserIdAndType indicates an expected call of NotificationsByUserIdAndType
+func (mr *MockDBMockRecorder) NotificationsByUserIdAndType(userId, nType interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotificationsByUserIdAndType", reflect.TypeOf((*MockDB)(nil).NotificationsByUserIdAndType), userId, nType)
 }
 
 // Insert mocks base method

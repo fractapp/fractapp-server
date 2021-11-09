@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fractapp-server/db"
-	"fractapp-server/mocks"
+	dbMock "fractapp-server/mocks/db"
 	"fractapp-server/types"
 	"fractapp-server/utils"
 	"io/ioutil"
@@ -14,9 +15,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/docker/pkg/ioutils"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"bou.ke/monkey"
 
@@ -27,7 +33,7 @@ import (
 
 func TestMainRoute(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	controller := NewController(mocks.NewMockDB(ctrl), "")
+	controller := NewController(dbMock.NewMockDB(ctrl), "")
 	assert.Equal(t, controller.MainRoute(), "/profile")
 }
 
@@ -36,6 +42,16 @@ func testErr(t *testing.T, controller *Controller, err error) {
 	controller.ReturnErr(err, w)
 
 	switch err {
+	case db.ErrNoRows:
+		assert.Equal(t, w.Code, http.StatusNotFound)
+	case InvalidFileFormatErr:
+		fallthrough
+	case InvalidFileSizeErr:
+		fallthrough
+	case UsernameIsExistErr:
+		fallthrough
+	case InvalidPropertyErr:
+		assert.Equal(t, w.Code, http.StatusBadRequest)
 	case UsernameNotFoundErr:
 		assert.Equal(t, w.Code, http.StatusNotFound)
 	default:
@@ -44,54 +60,54 @@ func testErr(t *testing.T, controller *Controller, err error) {
 }
 func TestReturnErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	controller := NewController(mocks.NewMockDB(ctrl), "")
+	controller := NewController(dbMock.NewMockDB(ctrl), "")
 
+	testErr(t, controller, db.ErrNoRows)
+	testErr(t, controller, InvalidFileFormatErr)
+	testErr(t, controller, InvalidFileSizeErr)
+	testErr(t, controller, UsernameIsExistErr)
+	testErr(t, controller, InvalidPropertyErr)
 	testErr(t, controller, UsernameNotFoundErr)
 	testErr(t, controller, errors.New("any errors"))
+}
+
+var addresses = map[types.Network]db.Address{
+	types.Polkadot: {
+		Address: "111111111111111111111111111111111HC1",
+	},
+	types.Kusama: {
+		Address: "CaKWz5omakTK7ovp4m3koXrHyHb7NG3Nt7GENHbviByZpKp",
+	},
+}
+
+var profile = &db.Profile{
+	Id:        db.NewId(),
+	AuthId:    "authId",
+	Username:  "fractapper10",
+	Addresses: addresses,
+}
+
+var user = &ShortUserProfile{
+	Id:         profile.AuthId,
+	Name:       profile.Name,
+	Username:   profile.Username,
+	AvatarExt:  profile.AvatarExt,
+	LastUpdate: profile.LastUpdate,
+	Addresses: map[types.Network]string{
+		types.Polkadot: addresses[types.Polkadot].Address,
+		types.Kusama:   addresses[types.Kusama].Address,
+	},
 }
 
 func TestSearchByUsername(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	value := "value"
-	profiles := []db.Profile{
-		{
-			Id:          "idOne",
-			Name:        "nameOne",
-			Username:    "usernameOne",
-			PhoneNumber: "phoneNumber",
-			Email:       "email",
-			IsMigratory: false,
-			AvatarExt:   "png",
-			LastUpdate:  123,
-		},
-	}
-	addresses := []db.Address{
-		{
-			Id:      "addressId",
-			Address: "address",
-			Network: types.Polkadot,
-		},
-	}
-
 	mockDb.EXPECT().SearchUsersByEmail(value).Return(nil, db.ErrNoRows)
-	mockDb.EXPECT().SearchUsersByUsername(value, 10).Return(profiles, nil)
-	mockDb.EXPECT().AddressesById(profiles[0].Id).Return(addresses, nil)
-
-	user := ShortUserProfile{
-		Id:         profiles[0].Id,
-		Name:       profiles[0].Name,
-		Username:   profiles[0].Username,
-		AvatarExt:  profiles[0].AvatarExt,
-		LastUpdate: profiles[0].LastUpdate,
-		Addresses:  make(map[types.Currency]string),
-	}
-	for _, v := range addresses {
-		user.Addresses[v.Network.Currency()] = v.Address
-	}
+	mockDb.EXPECT().SearchUsersByUsername(value, int64(10)).Return([]db.Profile{*profile}, nil)
 
 	search, err := controller.Handler("/search")
 	if err != nil {
@@ -117,47 +133,18 @@ func TestSearchByUsername(t *testing.T) {
 
 	assert.Assert(t, returnErr == nil)
 	assert.Assert(t, len(returnUsers) == 1)
-	assert.DeepEqual(t, returnUsers[0], user)
+	assert.DeepEqual(t, returnUsers[0], *user)
 }
+
 func TestSearchByEmail(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	value := "value@test.com"
-	profile := &db.Profile{
-		Id:          "idOne",
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
-	addresses := []db.Address{
-		{
-			Id:      "addressId",
-			Address: "address",
-			Network: types.Polkadot,
-		},
-	}
 
 	mockDb.EXPECT().SearchUsersByEmail(value).Return(profile, nil)
-	mockDb.EXPECT().AddressesById(profile.Id).Return(addresses, nil)
-
-	user := ShortUserProfile{
-		Id:         profile.Id,
-		Name:       profile.Name,
-		Username:   profile.Username,
-		AvatarExt:  profile.AvatarExt,
-		LastUpdate: profile.LastUpdate,
-		Addresses:  make(map[types.Currency]string),
-	}
-	for _, v := range addresses {
-		user.Addresses[v.Network.Currency()] = v.Address
-	}
 
 	search, err := controller.Handler("/search")
 	if err != nil {
@@ -183,12 +170,13 @@ func TestSearchByEmail(t *testing.T) {
 
 	assert.Assert(t, returnErr == nil)
 	assert.Assert(t, len(returnUsers) == 1)
-	assert.DeepEqual(t, returnUsers[0], user)
+	assert.DeepEqual(t, returnUsers[0], *user)
 }
+
 func TestSearchMinSearchLength(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	value := "val"
@@ -222,10 +210,10 @@ func TestSearchMinSearchLength(t *testing.T) {
 func TestProfileInfoById(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
-	originalId := "      123123      "
+	originalId := "      1231231231231231231231231231231231231231231231231231231231231234      "
 	id := strings.Trim(originalId, " ")
 
 	profileInfo, err := controller.Handler("/userInfo")
@@ -233,37 +221,7 @@ func TestProfileInfoById(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	profile := &db.Profile{
-		Id:          "idOne",
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
-	user := &ShortUserProfile{
-		Id:         profile.Id,
-		Name:       profile.Name,
-		Username:   profile.Username,
-		AvatarExt:  profile.AvatarExt,
-		LastUpdate: profile.LastUpdate,
-		Addresses:  make(map[types.Currency]string),
-	}
-	addresses := []db.Address{
-		{
-			Id:      "addressId",
-			Address: "address",
-			Network: types.Polkadot,
-		},
-	}
-	for _, v := range addresses {
-		user.Addresses[v.Network.Currency()] = v.Address
-	}
-
-	mockDb.EXPECT().ProfileById(id).Return(profile, nil)
-	mockDb.EXPECT().AddressesById(profile.Id).Return(addresses, nil)
+	mockDb.EXPECT().ProfileByAuthId(id).Return(profile, nil)
 
 	w := httptest.NewRecorder()
 	url, err := url.Parse("http://localhost:80/userInfo?id=" + id)
@@ -284,10 +242,11 @@ func TestProfileInfoById(t *testing.T) {
 	assert.Assert(t, returnErr == nil)
 	assert.DeepEqual(t, user, returnUser)
 }
+
 func TestMyProfile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	id := "id"
@@ -296,18 +255,8 @@ func TestMyProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	profile := &db.Profile{
-		Id:          "idOne",
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
 	myProfile := &MyProfile{
-		Id:          profile.Id,
+		Id:          profile.AuthId,
 		Name:        profile.Name,
 		Username:    profile.Username,
 		PhoneNumber: profile.PhoneNumber,
@@ -317,7 +266,7 @@ func TestMyProfile(t *testing.T) {
 		LastUpdate:  profile.LastUpdate,
 	}
 
-	mockDb.EXPECT().ProfileById(id).Return(profile, nil)
+	mockDb.EXPECT().ProfileByAuthId(id).Return(profile, nil)
 
 	w := httptest.NewRecorder()
 	ctx := context.WithValue(context.Background(), "auth_id", id)
@@ -336,10 +285,11 @@ func TestMyProfile(t *testing.T) {
 	assert.Assert(t, returnErr == nil)
 	assert.DeepEqual(t, myProfile, returnUser)
 }
+
 func TestUpdateProfile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	id := "id"
@@ -348,16 +298,6 @@ func TestUpdateProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	profile := &db.Profile{
-		Id:          "idOne",
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
 	rq := &UpdateProfileRq{
 		Name:     "New name",
 		Username: "newusername",
@@ -367,9 +307,9 @@ func TestUpdateProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mockDb.EXPECT().ProfileById(id).Return(profile, nil)
-	mockDb.EXPECT().UsernameIsExist(rq.Username).Return(false, nil)
-
+	profileArg := *profile
+	mockDb.EXPECT().ProfileByAuthId(id).Return(&profileArg, nil)
+	mockDb.EXPECT().IsUsernameExist(rq.Username).Return(false, nil)
 	timestamp := time.Date(2020, time.May, 19, 1, 10, 1, 0, time.UTC)
 	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
 	defer patchTime.Unpatch()
@@ -379,7 +319,7 @@ func TestUpdateProfile(t *testing.T) {
 	newProfile.Name = rq.Name
 	newProfile.LastUpdate = timestamp.Unix()
 
-	mockDb.EXPECT().UpdateByPK(&newProfile).Return(nil)
+	mockDb.EXPECT().UpdateByPK(newProfile.Id, &newProfile).Return(nil)
 
 	ctx := context.WithValue(context.Background(), "auth_id", id)
 	httpRq, err := http.NewRequestWithContext(ctx, "POST", "http://127.0.0.1:80", ioutil.NopCloser(bytes.NewReader(b)))
@@ -391,13 +331,13 @@ func TestUpdateProfile(t *testing.T) {
 
 	assert.Assert(t, err == nil)
 }
+
 func TestMyContacts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
-	id := "id"
 	profileInfo, err := controller.Handler("/contacts")
 	if err != nil {
 		t.Fatal(err)
@@ -405,11 +345,13 @@ func TestMyContacts(t *testing.T) {
 
 	contacts := []db.Contact{
 		{
-			Id:          id,
+			Id:          db.NewId(),
+			ProfileId:   profile.Id,
 			PhoneNumber: "phoneOne",
 		},
 		{
-			Id:          id,
+			Id:          db.NewId(),
+			ProfileId:   profile.Id,
 			PhoneNumber: "phoneTwo",
 		},
 	}
@@ -418,13 +360,13 @@ func TestMyContacts(t *testing.T) {
 		stringContacts = append(stringContacts, v.PhoneNumber)
 	}
 
-	mockDb.EXPECT().AllContacts(id).Return(contacts, nil)
+	mockDb.EXPECT().AllContacts(profile.Id).Return(contacts, nil)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 10, 1, 0, time.UTC)
 	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
 	defer patchTime.Unpatch()
 
-	ctx := context.WithValue(context.Background(), "auth_id", id)
+	ctx := context.WithValue(context.Background(), "profile_id", profile.Id)
 	httpRq, err := http.NewRequestWithContext(ctx, "POST", "http://127.0.0.1:80", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -442,106 +384,29 @@ func TestMyContacts(t *testing.T) {
 	}
 	assert.DeepEqual(t, returnContacts, stringContacts)
 }
+
 func TestMyMatchContacts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
-	id := "id"
 	myMatchContacts, err := controller.Handler("/matchContacts")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	profile := &db.Profile{
-		Id:          id,
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
 	contacts := []db.Profile{
-		{
-			Id:          "idOne",
-			Name:        "nameOne",
-			Username:    "usernameOne",
-			PhoneNumber: "phoneNumberOne",
-			Email:       "emailOne",
-			IsMigratory: false,
-			AvatarExt:   "",
-			LastUpdate:  123123,
-		},
-		{
-			Id:          "idTwo",
-			Name:        "nameTwo",
-			Username:    "usernameTwo",
-			PhoneNumber: "phoneNumberTwo",
-			Email:       "emailTwo",
-			IsMigratory: false,
-			AvatarExt:   "png",
-			LastUpdate:  123123,
-		},
+		*profile,
 	}
 	users := []ShortUserProfile{
-		{
-			Id:         contacts[0].Id,
-			Name:       contacts[0].Name,
-			Username:   contacts[0].Username,
-			AvatarExt:  contacts[0].AvatarExt,
-			LastUpdate: contacts[0].LastUpdate,
-			Addresses: map[types.Currency]string{
-				types.DOT: "dotAddressOne",
-				types.KSM: "ksmAddressOne",
-			},
-		},
-		{
-			Id:         contacts[1].Id,
-			Name:       contacts[1].Name,
-			Username:   contacts[1].Username,
-			AvatarExt:  contacts[1].AvatarExt,
-			LastUpdate: contacts[1].LastUpdate,
-			Addresses: map[types.Currency]string{
-				types.DOT: "dotAddressTwo",
-				types.KSM: "ksmAddressTwo",
-			},
-		},
-	}
-
-	addressesOne := []db.Address{
-		{
-			Id:      users[0].Id,
-			Address: users[0].Addresses[types.DOT],
-			Network: types.Polkadot,
-		},
-		{
-			Id:      users[0].Id,
-			Address: users[0].Addresses[types.KSM],
-			Network: types.Kusama,
-		},
-	}
-	addressesTwo := []db.Address{
-		{
-			Id:      users[1].Id,
-			Address: users[1].Addresses[types.DOT],
-			Network: types.Polkadot,
-		},
-		{
-			Id:      users[1].Id,
-			Address: users[1].Addresses[types.KSM],
-			Network: types.Kusama,
-		},
+		*user,
 	}
 
 	mockDb.EXPECT().ProfileById(profile.Id).Return(profile, nil)
-	mockDb.EXPECT().AllMatchContacts(profile.Id, profile.PhoneNumber).Return(contacts, nil)
-	mockDb.EXPECT().AddressesById(users[0].Id).Return(addressesOne, nil).Times(1)
-	mockDb.EXPECT().AddressesById(users[1].Id).Return(addressesTwo, nil).Times(1)
+	mockDb.EXPECT().AllMatchContacts(profile.Id).Return(contacts, nil)
 
-	ctx := context.WithValue(context.Background(), "auth_id", id)
+	ctx := context.WithValue(context.Background(), "profile_id", profile.Id)
 	httpRq, err := http.NewRequestWithContext(ctx, "POST", "http://127.0.0.1:80", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -559,24 +424,27 @@ func TestMyMatchContacts(t *testing.T) {
 	}
 	assert.DeepEqual(t, users, returnUsers)
 }
+
 func TestUploadMyContacts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
-	id := "id"
 	existContacts := []db.Contact{
 		{
-			Id:          id,
+			Id:          db.NewId(),
+			ProfileId:   profile.Id,
 			PhoneNumber: "contactOne",
 		},
 		{
-			Id:          id,
+			Id:          db.NewId(),
+			ProfileId:   profile.Id,
 			PhoneNumber: "contactTwo",
 		},
 		{
-			Id:          id,
+			Id:          db.NewId(),
+			ProfileId:   profile.Id,
 			PhoneNumber: "+12025550161",
 		},
 	}
@@ -592,21 +460,30 @@ func TestUploadMyContacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mockDb.EXPECT().AllContacts(id).Return(existContacts, nil)
-	myContacts := []db.Contact{
-		{
-			Id:          id,
-			PhoneNumber: newContacts[0],
-		},
-		{
-			Id:          id,
-			PhoneNumber: newContacts[1],
-		},
+	id := db.NewId()
+	patchId := monkey.Patch(primitive.NewObjectID, func() primitive.ObjectID { return primitive.ObjectID(id) })
+	defer patchId.Unpatch()
+
+	mockDb.EXPECT().AllContacts(profile.Id).Return(existContacts, nil)
+
+	contactOne := db.Contact{
+		Id:          db.NewId(),
+		ProfileId:   profile.Id,
+		PhoneNumber: newContacts[0],
+	}
+	contactTwo := db.Contact{
+		Id:          db.NewId(),
+		ProfileId:   profile.Id,
+		PhoneNumber: newContacts[1],
+	}
+	myContacts := []interface{}{
+		contactOne,
+		contactTwo,
 	}
 
-	mockDb.EXPECT().Insert(&myContacts).Return(nil)
+	mockDb.EXPECT().InsertMany(myContacts).Return(nil)
 
-	ctx := context.WithValue(context.Background(), "auth_id", id)
+	ctx := context.WithValue(context.Background(), "profile_id", profile.Id)
 	b, err := json.Marshal(newContacts)
 	if err != nil {
 		t.Fatal(err)
@@ -621,10 +498,11 @@ func TestUploadMyContacts(t *testing.T) {
 
 	assert.Assert(t, err == nil)
 }
+
 func TestFindUsername(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	originalUsername := "UserName"
@@ -634,7 +512,7 @@ func TestFindUsername(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mockDb.EXPECT().UsernameIsExist(username).Return(true, nil)
+	mockDb.EXPECT().IsUsernameExist(username).Return(true, nil)
 
 	url, err := url.Parse("http://localhost:80/username?username=" + originalUsername)
 	if err != nil {
@@ -649,10 +527,11 @@ func TestFindUsername(t *testing.T) {
 
 	assert.Assert(t, err == nil)
 }
+
 func TestFindUsernameNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	originalUsername := "UserName"
@@ -662,7 +541,7 @@ func TestFindUsernameNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mockDb.EXPECT().UsernameIsExist(username).Return(false, nil)
+	mockDb.EXPECT().IsUsernameExist(username).Return(false, nil)
 
 	url, err := url.Parse("http://localhost:80/username?username=" + originalUsername)
 	if err != nil {
@@ -677,11 +556,12 @@ func TestFindUsernameNotFound(t *testing.T) {
 
 	assert.Assert(t, err == UsernameNotFoundErr)
 }
+
 func TestUploadAvatar(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	id := "id"
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	var body bytes.Buffer
@@ -698,21 +578,13 @@ func TestUploadAvatar(t *testing.T) {
 	patchWriteAvatar := monkey.Patch(utils.WriteAvatar, func(fileName string, decoded []byte) error { return nil })
 	defer patchWriteAvatar.Unpatch()
 
-	profile := &db.Profile{
-		Id:          "idOne",
-		Name:        "nameOne",
-		Username:    "usernameOne",
-		PhoneNumber: "phoneNumber",
-		Email:       "email",
-		IsMigratory: false,
-		AvatarExt:   "png",
-		LastUpdate:  123,
-	}
-	mockDb.EXPECT().ProfileById(id).Return(profile, nil)
+	profileArg := *profile
+	mockDb.EXPECT().ProfileByAuthId(id).Return(&profileArg, nil)
+
 	newProfile := *profile
 	newProfile.LastUpdate = timestamp.Unix()
 	newProfile.AvatarExt = "jpeg"
-	mockDb.EXPECT().UpdateByPK(&newProfile).Return(nil)
+	mockDb.EXPECT().UpdateByPK(newProfile.Id, &newProfile).Return(nil)
 
 	req, err := http.NewRequestWithContext(context.WithValue(context.Background(), "auth_id", id), http.MethodPost, "http://localhost:80", &body)
 	if err != nil {
@@ -733,7 +605,7 @@ func TestUploadAvatarInvalidFormat(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	id := "id"
-	mockDb := mocks.NewMockDB(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
 	controller := NewController(mockDb, "")
 
 	var body bytes.Buffer
@@ -756,4 +628,252 @@ func TestUploadAvatarInvalidFormat(t *testing.T) {
 	err = uploadAvatar(nil, req)
 
 	assert.Assert(t, err == InvalidFileFormatErr)
+}
+
+func TestUpdateFirebaseTokenUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, "")
+
+	rq := &UpdateFirebaseTokenRq{
+		Token: "token",
+	}
+	b, err := json.Marshal(rq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mockDb.EXPECT().SubscribersCountByToken(rq.Token).Return(int64(0), nil)
+	sub := &db.Subscriber{
+		Id:        db.NewId(),
+		ProfileId: profile.Id,
+		Token:     "token2",
+		Timestamp: 1000,
+	}
+	mockDb.EXPECT().SubscriberByProfileId(profile.Id).Return(sub, nil)
+	newSub := *sub
+	newSub.Token = rq.Token
+	mockDb.EXPECT().UpdateByPK(newSub.Id, &newSub)
+
+	req, err := http.NewRequestWithContext(context.WithValue(context.Background(), "profile_id", profile.Id), http.MethodPost, "http://localhost:80", ioutil.NopCloser(bytes.NewReader(b)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	routeFn, err := controller.Handler("/firebase/update")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = routeFn(nil, req)
+
+	assert.Assert(t, err == nil)
+}
+
+func TestUpdateFirebaseTokenCreate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, "")
+
+	rq := &UpdateFirebaseTokenRq{
+		Token: "token",
+	}
+	b, err := json.Marshal(rq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id := db.NewId()
+	patchId := monkey.Patch(primitive.NewObjectID, func() primitive.ObjectID { return primitive.ObjectID(id) })
+	defer patchId.Unpatch()
+
+	timestamp := time.Date(2020, time.May, 19, 1, 10, 1, 0, time.UTC)
+	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
+	defer patchTime.Unpatch()
+
+	mockDb.EXPECT().SubscribersCountByToken(rq.Token).Return(int64(0), nil)
+	mockDb.EXPECT().SubscriberByProfileId(profile.Id).Return(nil, db.ErrNoRows)
+	sub := &db.Subscriber{
+		Id:        db.NewId(),
+		Token:     rq.Token,
+		ProfileId: profile.Id,
+		Timestamp: timestamp.Unix(),
+	}
+	mockDb.EXPECT().Insert(sub)
+
+	req, err := http.NewRequestWithContext(context.WithValue(context.Background(), "profile_id", profile.Id), http.MethodPost, "http://localhost:80", ioutil.NopCloser(bytes.NewReader(b)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	routeFn, err := controller.Handler("/firebase/update")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = routeFn(nil, req)
+
+	assert.Assert(t, err == nil)
+}
+
+func TestTxStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	txApiHost := "txApiHost"
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, txApiHost)
+
+	routeFn, err := controller.Handler("/transaction/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+
+	hash := "hash"
+
+	httpRq, err := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:80?hash=%s", hash), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rs := TxStatusScannerApiRs{
+		Status: 12,
+	}
+	rsByte, _ := json.Marshal(rs)
+	r := ioutils.NewReadCloserWrapper(bytes.NewReader(rsByte), func() error {
+		return nil
+	})
+
+	mockUrl := ""
+	httpPatch := monkey.PatchInstanceMethod(reflect.TypeOf(http.DefaultClient), "Get", func(client *http.Client, url string) (resp *http.Response, err error) {
+		mockUrl = url
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       r,
+		}, nil
+	})
+	defer httpPatch.Unpatch()
+
+	err = routeFn(w, httpRq)
+	assert.Assert(t, err, nil)
+	assert.DeepEqual(t, mockUrl, fmt.Sprintf("%s/transaction/%s",
+		txApiHost, hash))
+
+	b, _ := json.Marshal(TxStatusRs{
+		Hash:   hash,
+		Status: rs.Status,
+	})
+	assert.DeepEqual(t, b, w.Body.Bytes())
+}
+
+func TestTransaction(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	txApiHost := "txApiHost"
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, txApiHost)
+
+	routeFn, err := controller.Handler("/transactions")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	address := "address"
+	currency := types.DOT
+	httpRq, err := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:80?address=%s&currency=%d", address, currency), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rs := []Transaction{
+		{
+			ID:        "id",
+			Hash:      "hash",
+			Action:    db.Transfer,
+			Currency:  currency,
+			To:        "to",
+			From:      "from",
+			Value:     "value",
+			Fee:       "1999123",
+			Timestamp: 100023,
+			Status:    db.Success,
+		},
+	}
+	rsByte, _ := json.Marshal(rs)
+	r := ioutils.NewReadCloserWrapper(bytes.NewReader(rsByte), func() error {
+		return nil
+	})
+
+	userTo := &db.Profile{
+		Id:        db.NewId(),
+		AuthId:    "authId12",
+		Username:  "fractapper23",
+		Addresses: addresses,
+	}
+	responseTxs := make([]OldTransactionRs, 0)
+	for _, v := range rs {
+		txTime := time.Unix(v.Timestamp/1000, 0)
+		mockDb.EXPECT().Prices(
+			currency.String(), txTime.
+				Add(-15*time.Minute).Unix()*1000,
+			txTime.
+				Add(15*time.Minute).Unix()*1000,
+		).
+			Return([]db.Price{
+				{
+					Timestamp: v.Timestamp + (-12 * time.Minute).Milliseconds(),
+					Currency:  currency.String(),
+					Price:     12345,
+				},
+				{
+					Timestamp: v.Timestamp + (1 * time.Minute).Milliseconds(),
+					Currency:  currency.String(),
+					Price:     2,
+				},
+			}, nil)
+
+		mockDb.EXPECT().ProfileByAddress(currency.Network(), v.From).Return(profile, nil)
+		mockDb.EXPECT().ProfileByAddress(currency.Network(), v.To).Return(userTo, nil)
+
+		responseTxs = append(responseTxs, OldTransactionRs{
+			ID:   v.ID,
+			Hash: v.Hash,
+
+			Currency: v.Currency,
+
+			From:     v.From,
+			UserFrom: profile.AuthId,
+
+			To:     v.To,
+			UserTo: userTo.AuthId,
+
+			Action: v.Action,
+			Value:  v.Value,
+			Price:  2,
+
+			Fee:       v.Fee,
+			Timestamp: v.Timestamp,
+			Status:    v.Status,
+		})
+	}
+
+	mockUrl := ""
+	httpPatch := monkey.PatchInstanceMethod(reflect.TypeOf(http.DefaultClient), "Get", func(client *http.Client, url string) (resp *http.Response, err error) {
+		mockUrl = url
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       r,
+		}, nil
+	})
+	defer httpPatch.Unpatch()
+
+	err = routeFn(w, httpRq)
+	assert.Assert(t, err, nil)
+	assert.DeepEqual(t, mockUrl, fmt.Sprintf("%s/transactions/%s?currency=%s",
+		txApiHost, address, currency.String()))
+
+	b, _ := json.Marshal(responseTxs)
+	assert.DeepEqual(t, b, w.Body.Bytes())
 }

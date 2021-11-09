@@ -7,7 +7,6 @@ import (
 	"fractapp-server/controller/middleware"
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
-	"fractapp-server/push"
 	"fractapp-server/types"
 	"io/ioutil"
 	"net/http"
@@ -24,14 +23,16 @@ const (
 )
 
 type Controller struct {
-	notificator push.Notificator
-	db          db.DB
+	db db.DB
 }
 
-func NewController(db db.DB, notificator push.Notificator) *Controller {
+var (
+	InvalidConnectionTxApiErr = errors.New("invalid connection to transaction API")
+)
+
+func NewController(db db.DB) *Controller {
 	return &Controller{
-		notificator: notificator,
-		db:          db,
+		db: db,
 	}
 }
 
@@ -59,7 +60,7 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	}
 }
 
-// unread godoc
+// unread godoc TODO: old
 // @Summary Unread messages
 // @Description get unread messages
 // @ID unread
@@ -76,9 +77,20 @@ func (c *Controller) unread(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	dbMessages, err := c.db.MessagesByReceiver(receiverProfile.Id)
-	if err != nil {
-		return err
+	notifications, err := c.db.UndeliveredNotificationsByUserId(receiverProfile.Id)
+	dbMessages := make([]*db.Message, 0)
+	for _, notification := range notifications {
+		if notification.Type != db.MessageNotificationType {
+			continue
+		}
+
+		msg, err := c.db.MessageById(notification.TargetId)
+		if err != nil {
+			log.Infof("ws - id: %s; error: %s\n", receiverProfile.AuthId, err.Error())
+			continue
+		}
+
+		dbMessages = append(dbMessages, msg)
 	}
 
 	usersById := make(map[db.ID]db.Profile)
@@ -103,7 +115,7 @@ func (c *Controller) unread(w http.ResponseWriter, r *http.Request) error {
 			Value:     msg.Value,
 			Rows:      msg.Rows,
 			Sender:    sender.AuthId,
-			Receiver:  receiverProfile.AuthId,
+			Receiver:  id,
 			Timestamp: msg.Timestamp,
 		})
 	}
@@ -127,10 +139,12 @@ func (c *Controller) unread(w http.ResponseWriter, r *http.Request) error {
 		users[user.AuthId] = p
 	}
 
-	err = controller.JSON(w, &MessagesAndUsersRs{
+	messagesAndUsers := &MessagesAndTxs{
 		Messages: messages,
 		Users:    users,
-	})
+	}
+
+	err = controller.JSON(w, messagesAndUsers)
 	if err != nil {
 		return err
 	}
@@ -163,15 +177,24 @@ func (c *Controller) read(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	for _, stringMsgId := range rq {
-		msgId, err := primitive.ObjectIDFromHex(stringMsgId)
-		if err != nil {
-			continue
-		}
+	targetIdsMap := make(map[string]bool)
+	for _, id := range rq {
+		targetIdsMap[id] = true
+	}
 
-		err = c.db.SetDelivered(db.ID(id), db.ID(msgId))
-		if err != nil {
-			continue
+	notifications, err := c.db.UndeliveredNotificationsByUserId(id)
+	if err != nil {
+		return err
+	}
+
+	for _, notification := range notifications {
+		stringTargetId := primitive.ObjectID(notification.TargetId).Hex()
+		if _, ok := targetIdsMap[stringTargetId]; ok {
+			notification.Delivered = true
+			err := c.db.UpdateByPK(notification.Id, &notification)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -233,16 +256,15 @@ func (c *Controller) send(w http.ResponseWriter, r *http.Request) error {
 
 	timestamp := time.Now().UnixNano() / int64(time.Millisecond)
 	dbMessage := &db.Message{
-		Id:          db.NewId(),
-		Value:       msg.Value,
-		Action:      msg.Action,
-		Version:     msg.Version,
-		Args:        msg.Args,
-		Rows:        msg.Rows,
-		SenderId:    senderProfile.Id,
-		ReceiverId:  receiverProfile.Id,
-		Timestamp:   timestamp,
-		IsDelivered: false,
+		Id:         db.NewId(),
+		Value:      msg.Value,
+		Action:     msg.Action,
+		Version:    1,
+		Args:       msg.Args,
+		Rows:       msg.Rows,
+		SenderId:   senderProfile.Id,
+		ReceiverId: receiverProfile.Id,
+		Timestamp:  timestamp,
 	}
 
 	err = c.db.Insert(dbMessage)
@@ -250,16 +272,21 @@ func (c *Controller) send(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if !receiverProfile.IsChatBot {
-		token, err := c.db.TokenByProfileId(receiverProfile.Id)
-		if err != nil {
-			log.Errorf("Push notification error: %d \n", err)
-		}
+	notification := &db.Notification{
+		Id:               db.NewId(),
+		Type:             db.MessageNotificationType,
+		Title:            senderTitle,
+		Message:          dbMessage.Value,
+		TargetId:         dbMessage.Id,
+		UserId:           dbMessage.ReceiverId,
+		FirebaseNotified: false,
+		Delivered:        false,
+		Timestamp:        time.Now().Unix(),
+	}
 
-		notifyErr := c.notificator.Notify(msg.Value, senderTitle, token.Token)
-		if notifyErr != nil {
-			log.Errorf("Push notification error: %d \n", notifyErr)
-		}
+	err = c.db.Insert(notification)
+	if err != nil {
+		return err
 	}
 
 	err = controller.JSON(w, &SendInfo{

@@ -13,10 +13,10 @@ import (
 	internalMiddleware "fractapp-server/controller/middleware"
 	"fractapp-server/controller/profile"
 	"fractapp-server/controller/substrate"
+	"fractapp-server/controller/websocket"
 	"fractapp-server/db"
 	"fractapp-server/docs"
 	"fractapp-server/notification"
-	"fractapp-server/push"
 	"log"
 	"net/http"
 	"os"
@@ -146,12 +146,9 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 
 	authMiddleware := internalMiddleware.New(mongoDB)
 
-	notificator, err := push.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
-	if err != nil {
-		log.Fatalf("Invalid create notificator: %s", err.Error())
-		return err
-	}
-	messageController := message.NewController(mongoDB, notificator)
+	messageController := message.NewController(mongoDB)
+
+	websocketController := websocket.NewController(mongoDB, tokenAuth, authMiddleware, config.TransactionApi)
 
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Swagger Fractapp Server API"
@@ -211,6 +208,8 @@ func start(ctx context.Context, cancel context.CancelFunc) error {
 		r.Get(substrateController.MainRoute()+substrate.TxBaseRoute, controller.Route(substrateController, substrate.TxBaseRoute))
 		r.Post(substrateController.MainRoute()+substrate.BroadcastRoute, controller.Route(substrateController, substrate.BroadcastRoute))
 		r.Get(substrateController.MainRoute()+substrate.BalanceRoute, controller.Route(substrateController, substrate.BalanceRoute))
+
+		r.Get(websocketController.MainRoute()+websocket.ConnectRoute, controller.Route(websocketController, websocket.ConnectRoute))
 	})
 
 	srv := &http.Server{

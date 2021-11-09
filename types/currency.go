@@ -2,7 +2,6 @@ package types
 
 import (
 	"math/big"
-	"strings"
 )
 
 type Currency int32
@@ -57,19 +56,6 @@ func (c Currency) ConvertFromPlanckToView(amount *big.Int) *big.Float {
 	d.Exp(big.NewInt(10), big.NewInt(decimals), nil)
 
 	return new(big.Float).Quo(new(big.Float).SetInt(amount), new(big.Float).SetInt(d))
-}
-
-func ParseCurrency(name string) (c Currency) {
-	c = DOT
-
-	switch strings.ToLower(name) {
-	case "DOT":
-		c = DOT
-	case "KSM":
-		c = KSM
-	}
-
-	return c
 }
 
 func (c Currency) Decimals() int64 {

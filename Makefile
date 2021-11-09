@@ -1,6 +1,5 @@
-
 updateMocks:
-	rm mocks/*
+	rm -r mocks/*
 	${GOPATH}/bin/mockgen --source $(CURDIR)/db/db.go --destination $(CURDIR)/mocks/db/db_mock.go --package mocks
 	${GOPATH}/bin/mockgen --source $(CURDIR)/notification/notificator.go --destination $(CURDIR)/mocks/notification/notificator_mock.go --package mocks
 	${GOPATH}/bin/mockgen --source $(CURDIR)/push/notificator.go --destination $(CURDIR)/mocks/push/notificator_mock.go --package mocks

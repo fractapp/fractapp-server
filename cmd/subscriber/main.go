@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fractapp-server/config"
+	"fractapp-server/controller"
 	"fractapp-server/db"
 	"fractapp-server/push"
-	"fractapp-server/types"
-	"io/ioutil"
-	"math/big"
+	"fractapp-server/subscriber"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,24 +27,14 @@ var (
 	configPath = "config.json"
 )
 
-type NotifierRequest struct {
-	From     string `json:"from"`
-	To       string `json:"to"`
-	Value    string `json:"value"`
-	Currency int    `json:"currency"`
-}
-
 func init() {
 	flag.StringVar(&host, "host", host, "host for server")
 	flag.StringVar(&configPath, "config", configPath, "config file")
 	flag.Parse()
 }
 
-var database db.DB
-var notificator push.Notificator
-
 func main() {
-	log.Info("Start price cache ...")
+	log.Info("Start subscriber...")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	config, err := config.Parse(configPath)
@@ -54,7 +42,7 @@ func main() {
 		log.Fatalf("Invalid parse config: %s", err.Error())
 	}
 
-	notificator, err = push.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
+	notificator, err := push.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
 	if err != nil {
 		log.Fatalf("Invalid create notificator: %s", err.Error())
 	}
@@ -76,7 +64,7 @@ func main() {
 		panic(err)
 	}
 
-	database, err = db.NewMongoDB(ctx, mongoClient)
+	database, err := db.NewMongoDB(ctx, mongoClient)
 	if err != nil {
 		panic(err)
 	}
@@ -89,9 +77,10 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
+	subController := subscriber.NewController(database, notificator)
 	r.Group(func(r chi.Router) {
-		r.Route("/", func(r chi.Router) {
-			r.Post("/notify", handler)
+		r.Route(subController.MainRoute(), func(r chi.Router) {
+			r.Post(subscriber.NotifyRoute, controller.Route(subController, subscriber.NotifyRoute))
 		})
 	})
 
@@ -120,84 +109,4 @@ func main() {
 	srv.Shutdown(exitCtx)
 
 	cancel()
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	err := notifyRoute(w, r)
-	if err != nil {
-		log.Errorf("Error: %d \n", err)
-		http.Error(w, "", http.StatusBadRequest)
-	}
-}
-
-func notifyRoute(w http.ResponseWriter, r *http.Request) error {
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-
-	var nRq NotifierRequest
-	err = json.Unmarshal(b, &nRq)
-	if err != nil {
-		return err
-	}
-
-	currency := types.Currency(nRq.Currency)
-	err = sendNotification(nRq.From, nRq.To, push.Sent, currency, nRq.Value)
-	if err != nil {
-		return err
-	}
-
-	err = sendNotification(nRq.To, nRq.From, push.Received, currency, nRq.Value)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-//TODO: invalid receiver and address receiver/sender
-func sendNotification(addressForNotificator string, memberAddress string, txType push.TxType, currency types.Currency, value string) error {
-	network := currency.Network()
-
-	profile, err := database.ProfileByAddress(network, memberAddress)
-	if err != nil && err != db.ErrNoRows {
-		return err
-	}
-	if err == db.ErrNoRows {
-		return nil
-	}
-
-	sub, err := database.SubscriberByProfileId(profile.Id)
-	if err != nil && err != db.ErrNoRows {
-		return err
-	}
-	if err == db.ErrNoRows {
-		return nil
-	}
-
-	amount, _ := new(big.Int).SetString(value, 10)
-	fAmount, _ := currency.ConvertFromPlanck(amount).Float64()
-
-	msg := notificator.MsgForAuthed(txType, fAmount, currency)
-	address, ok := profile.Addresses[network]
-	if !ok {
-		return nil
-	}
-
-	log.Infof("Notify (%s): %s \n", address, msg)
-
-	name := ""
-	if profile.Name != "" {
-		name = profile.Name
-	} else {
-		name = "@" + profile.Username
-	}
-
-	notifyErr := notificator.Notify(name, msg, sub.Token)
-	if notifyErr != nil {
-		log.Errorf("%d \n", notifyErr)
-	}
-
-	return nil
 }

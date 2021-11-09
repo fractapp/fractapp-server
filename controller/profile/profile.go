@@ -135,6 +135,33 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	}
 }
 
+func TxStatus(txApiHost string, hash string) (*TxStatusRs, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/transaction/%s", txApiHost, hash))
+	if err != nil {
+		return nil, InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	status := new(TxStatusScannerApiRs)
+	err = json.Unmarshal(body, &status)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TxStatusRs{
+		Hash:   hash,
+		Status: status.Status,
+	}, nil
+}
+
 // search godoc
 // @Summary Search user
 // @Description search user by email or username
@@ -590,7 +617,7 @@ func (c *Controller) uploadMyContacts(w http.ResponseWriter, r *http.Request) er
 			continue
 		}
 
-		myContacts = append(myContacts, &db.Contact{
+		myContacts = append(myContacts, db.Contact{
 			Id:          db.NewId(),
 			ProfileId:   profileId,
 			PhoneNumber: v,
@@ -654,29 +681,12 @@ func (c *Controller) usernameIsExist(username string) (bool, error) {
 // @Router /profile/transaction/status [get]
 func (c *Controller) transactionStatus(w http.ResponseWriter, r *http.Request) error {
 	hash := r.URL.Query().Get("hash")
-
-	resp, err := http.Get(fmt.Sprintf("%s/transaction/%s", c.txApiHost, hash))
-	if err != nil {
-		return InvalidConnectionTxApiErr
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return InvalidConnectionTxApiErr
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	status := new(TxStatusRs)
-	err = json.Unmarshal(body, &status)
-
+	txStatus, err := TxStatus(c.txApiHost, hash)
 	if err != nil {
 		return err
 	}
 
-	rsByte, err := json.Marshal(status)
+	rsByte, err := json.Marshal(txStatus)
 	if err != nil {
 		return err
 	}
@@ -728,7 +738,7 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	responseTxs := make([]TransactionRs, 0)
+	responseTxs := make([]OldTransactionRs, 0)
 	for _, v := range txs {
 		txTime := time.Unix(v.Timestamp/1000, 0)
 		prices, err := c.db.Prices(currency.String(), txTime.
@@ -775,7 +785,7 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 			userTo = p.AuthId
 		}
 
-		responseTxs = append(responseTxs, TransactionRs{
+		responseTxs = append(responseTxs, OldTransactionRs{
 			ID:   v.ID,
 			Hash: v.Hash,
 
@@ -819,7 +829,7 @@ func (c *Controller) transactions(w http.ResponseWriter, r *http.Request) error 
 // @Param rq body UpdateFirebaseTokenRq true "update token request"
 // @Success 200
 // @Failure 400 {string} string
-// @Router /firebase/update [post]
+// @Router /profile/firebase/update [post]
 func (c *Controller) updateFirebaseToken(w http.ResponseWriter, r *http.Request) error {
 	profileId := middleware.ProfileId(r)
 

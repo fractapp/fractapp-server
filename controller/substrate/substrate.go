@@ -37,6 +37,30 @@ func NewController(db db.DB, txApiHost string) *Controller {
 		txApiHost: txApiHost,
 	}
 }
+func SubstrateBalance(txApiHost string, address string, currency types.Currency) (*Balance, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/substrate/balance/%s?currency=%s", txApiHost, address, currency.String()))
+	if err != nil {
+		return nil, InvalidConnectionTxApiErr
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, InvalidConnectionTxApiErr
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	balance := new(Balance)
+	err = json.Unmarshal(body, &balance)
+	if err != nil {
+		return nil, err
+	}
+
+	return balance, nil
+}
 
 func (c *Controller) MainRoute() string {
 	return "/substrate"
@@ -368,23 +392,7 @@ func (c *Controller) substrateBalance(w http.ResponseWriter, r *http.Request) er
 	}
 	currency := types.Currency(currencyInt)
 
-	resp, err := http.Get(fmt.Sprintf("%s/substrate/balance/%s?currency=%s", c.txApiHost, address, currency.String()))
-	if err != nil {
-		return InvalidConnectionTxApiErr
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return InvalidConnectionTxApiErr
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	balance := new(Balance)
-	err = json.Unmarshal(body, &balance)
+	balance, err := SubstrateBalance(c.txApiHost, address, currency)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,8 @@ package types
 import (
 	"math/big"
 	"testing"
+
+	"gotest.tools/assert"
 )
 
 func TestDOTToString(t *testing.T) {
@@ -58,4 +60,25 @@ func TestConvertFromPlanck(t *testing.T) {
 	if c.ConvertFromPlanck(amount).Cmp(f) != 0 {
 		t.Fatal()
 	}
+}
+
+func TestAccuracy(t *testing.T) {
+	assert.Equal(t, DOT.Accuracy(), int64(1000))
+	assert.Equal(t, KSM.Accuracy(), int64(1000))
+	assert.Equal(t, Currency(10000).Accuracy(), int64(1000))
+}
+
+func TestNetwork(t *testing.T) {
+	assert.Equal(t, DOT.Network(), Polkadot)
+	assert.Equal(t, KSM.Network(), Kusama)
+	assert.Equal(t, Currency(10000).Network(), Polkadot)
+}
+
+func TestConvertFromPlanckToView(t *testing.T) {
+	a := &big.Int{}
+	a.SetString("10000010000", 10)
+
+	assert.Equal(t, DOT.ConvertFromPlanckToView(a).String(), "1.000001")
+	assert.Equal(t, KSM.ConvertFromPlanckToView(a).String(), "0.01000001")
+	assert.Equal(t, Currency(10000).ConvertFromPlanckToView(a).String(), "1.000001")
 }

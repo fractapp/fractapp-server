@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"fractapp-server/controller"
 	"fractapp-server/db"
-	"fractapp-server/mocks"
+	dbMock "fractapp-server/mocks/db"
+	notificationMock "fractapp-server/mocks/notification"
 	"fractapp-server/notification"
 	"fractapp-server/types"
 	"fractapp-server/utils"
@@ -17,6 +18,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"bou.ke/monkey"
 
@@ -30,7 +33,7 @@ func TestMainRoute(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	controller := NewController(mocks.NewMockDB(ctrl), nil, nil, tokenAuth)
+	controller := NewController(dbMock.NewMockDB(ctrl), nil, nil, tokenAuth)
 	assert.Equal(t, controller.MainRoute(), "/auth")
 }
 
@@ -65,7 +68,7 @@ func TestReturnErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	controller := NewController(mocks.NewMockDB(ctrl), mocks.NewMockNotificator(ctrl), mocks.NewMockNotificator(ctrl), tokenAuth)
+	controller := NewController(dbMock.NewMockDB(ctrl), notificationMock.NewMockNotificator(ctrl), notificationMock.NewMockNotificator(ctrl), tokenAuth)
 
 	testErr(t, controller, notification.InvalidEmailErr)
 	testErr(t, controller, InvalidCodeErr)
@@ -79,7 +82,7 @@ func TestReturnErr(t *testing.T) {
 	testErr(t, controller, errors.New("any errors"))
 }
 
-func mockConfirmCode(mockDb *mocks.MockDB, value string, code string, notificatorType notification.NotificatorType) {
+func mockConfirmCode(mockDb *dbMock.MockDB, value string, code string, notificatorType notification.NotificatorType) {
 	expectAuthOne := &db.Auth{
 		Value:     value,
 		IsValid:   true,
@@ -88,36 +91,35 @@ func mockConfirmCode(mockDb *mocks.MockDB, value string, code string, notificato
 		Count:     0,
 		Timestamp: time.Now().Unix(),
 		Type:      notificatorType,
-		CheckType: notification.Auth,
 	}
 
-	mockDb.EXPECT().AuthByValue(value, notificatorType, notification.Auth).Return(expectAuthOne, nil)
+	mockDb.EXPECT().AuthByValue(value, notificatorType).Return(expectAuthOne, nil)
 
 	expectAuthTwo := *expectAuthOne
 	expectAuthTwo.IsValid = false
-	mockDb.EXPECT().UpdateByPK(&expectAuthTwo).Return(nil)
+	mockDb.EXPECT().UpdateByPK(expectAuthTwo.Id, &expectAuthTwo).Return(nil)
 }
 
 func TestConfirmPositive(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb, mocks.NewMockNotificator(ctrl), mocks.NewMockNotificator(ctrl), tokenAuth)
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, notificationMock.NewMockNotificator(ctrl), notificationMock.NewMockNotificator(ctrl), tokenAuth)
 
 	code := "123123"
 	value := "phoneNumber"
 
 	mockConfirmCode(mockDb, value, code, notification.SMS)
-	err := controller.confirm(value, notification.SMS, notification.Auth, code)
+	err := controller.confirm(value, notification.SMS, code)
 	assert.Assert(t, err == nil)
 }
 func TestConfirmWithInvalidCode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb, mocks.NewMockNotificator(ctrl), mocks.NewMockNotificator(ctrl), tokenAuth)
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, notificationMock.NewMockNotificator(ctrl), notificationMock.NewMockNotificator(ctrl), tokenAuth)
 
 	code := "123123"
 	value := "phoneNumber"
@@ -130,24 +132,23 @@ func TestConfirmWithInvalidCode(t *testing.T) {
 		Count:     0,
 		Timestamp: time.Now().Unix(),
 		Type:      notification.SMS,
-		CheckType: notification.Auth,
 	}
 
-	mockDb.EXPECT().AuthByValue(value, notification.SMS, notification.Auth).Return(expectAuthOne, nil)
+	mockDb.EXPECT().AuthByValue(value, notification.SMS).Return(expectAuthOne, nil)
 
 	expectAuthTwo := *expectAuthOne
 	expectAuthTwo.Attempts++
-	mockDb.EXPECT().UpdateByPK(&expectAuthTwo).Return(nil)
+	mockDb.EXPECT().UpdateByPK(expectAuthTwo.Id, &expectAuthTwo).Return(nil)
 
-	err := controller.confirm(value, notification.SMS, notification.Auth, code)
+	err := controller.confirm(value, notification.SMS, code)
 	assert.Assert(t, err == InvalidCodeErr)
 }
 func TestConfirmWithUsedCode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb, mocks.NewMockNotificator(ctrl), mocks.NewMockNotificator(ctrl), tokenAuth)
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, notificationMock.NewMockNotificator(ctrl), notificationMock.NewMockNotificator(ctrl), tokenAuth)
 
 	code := "123123"
 	value := "phoneNumber"
@@ -160,24 +161,23 @@ func TestConfirmWithUsedCode(t *testing.T) {
 		Count:     0,
 		Timestamp: time.Now().Unix(),
 		Type:      notification.SMS,
-		CheckType: notification.Auth,
 	}
 
-	mockDb.EXPECT().AuthByValue(value, notification.SMS, notification.Auth).Return(expectAuthOne, nil)
+	mockDb.EXPECT().AuthByValue(value, notification.SMS).Return(expectAuthOne, nil)
 
 	expectAuthTwo := *expectAuthOne
 	expectAuthTwo.IsValid = false
-	mockDb.EXPECT().UpdateByPK(&expectAuthTwo).Return(nil)
+	mockDb.EXPECT().UpdateByPK(expectAuthTwo.Id, &expectAuthTwo).Return(nil)
 
-	err := controller.confirm(value, notification.SMS, notification.Auth, code)
+	err := controller.confirm(value, notification.SMS, code)
 	assert.Assert(t, err == CodeUsedErr)
 }
 func TestConfirmWithMaxWrongCodeAttempts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb, mocks.NewMockNotificator(ctrl), mocks.NewMockNotificator(ctrl), tokenAuth)
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, notificationMock.NewMockNotificator(ctrl), notificationMock.NewMockNotificator(ctrl), tokenAuth)
 
 	code := "123123"
 	value := "phoneNumber"
@@ -190,24 +190,23 @@ func TestConfirmWithMaxWrongCodeAttempts(t *testing.T) {
 		Count:     0,
 		Timestamp: time.Now().Unix(),
 		Type:      notification.SMS,
-		CheckType: notification.Auth,
 	}
 
-	mockDb.EXPECT().AuthByValue(value, notification.SMS, notification.Auth).Return(expectAuthOne, nil)
+	mockDb.EXPECT().AuthByValue(value, notification.SMS).Return(expectAuthOne, nil)
 
 	expectAuthTwo := *expectAuthOne
 	expectAuthTwo.IsValid = false
-	mockDb.EXPECT().UpdateByPK(&expectAuthTwo).Return(nil)
+	mockDb.EXPECT().UpdateByPK(expectAuthTwo.Id, &expectAuthTwo).Return(nil)
 
-	err := controller.confirm(value, notification.SMS, notification.Auth, code)
+	err := controller.confirm(value, notification.SMS, code)
 	assert.Assert(t, err == InvalidNumberOfAttemptsErr)
 }
 func TestConfirmWithCodeExpired(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	controller := NewController(mockDb, mocks.NewMockNotificator(ctrl), mocks.NewMockNotificator(ctrl), tokenAuth)
+	mockDb := dbMock.NewMockDB(ctrl)
+	controller := NewController(mockDb, notificationMock.NewMockNotificator(ctrl), notificationMock.NewMockNotificator(ctrl), tokenAuth)
 
 	code := "123123"
 	value := "phoneNumber"
@@ -225,16 +224,15 @@ func TestConfirmWithCodeExpired(t *testing.T) {
 		Count:     0,
 		Timestamp: authTimestamp.Unix(),
 		Type:      notification.SMS,
-		CheckType: notification.Auth,
 	}
 
-	mockDb.EXPECT().AuthByValue(value, notification.SMS, notification.Auth).Return(expectAuthOne, nil)
+	mockDb.EXPECT().AuthByValue(value, notification.SMS).Return(expectAuthOne, nil)
 
 	expectAuthTwo := *expectAuthOne
 	expectAuthTwo.IsValid = false
-	mockDb.EXPECT().UpdateByPK(&expectAuthTwo).Return(nil)
+	mockDb.EXPECT().UpdateByPK(expectAuthTwo.Id, &expectAuthTwo).Return(nil)
 
-	err := controller.confirm(value, notification.SMS, notification.Auth, code)
+	err := controller.confirm(value, notification.SMS, code)
 	assert.Assert(t, err == CodeExpiredErr)
 }
 
@@ -242,8 +240,8 @@ func TestSendCodeForNewUser(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	sendCode, err := controller.Handler("/sendCode")
@@ -252,9 +250,8 @@ func TestSendCodeForNewUser(t *testing.T) {
 	}
 
 	rq := SendCodeRq{
-		Type:      notification.Email,
-		CheckType: notification.Auth,
-		Value:     "test@test.com",
+		Type:  notification.Email,
+		Value: "test@test.com",
 	}
 
 	timestamp := time.Date(2020, time.May, 19, 1, 2, 3, 4, time.UTC)
@@ -270,13 +267,17 @@ func TestSendCodeForNewUser(t *testing.T) {
 	})
 	defer patchCode.Unpatch()
 
-	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type, rq.CheckType).Return(nil, db.ErrNoRows)
+	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type).Return(nil, db.ErrNoRows)
+
+	id := db.NewId()
+	patchId := monkey.Patch(primitive.NewObjectID, func() primitive.ObjectID { return primitive.ObjectID(id) })
+	defer patchId.Unpatch()
 
 	auth := &db.Auth{
+		Id:        id,
 		Value:     rq.Value,
 		Type:      rq.Type,
 		IsValid:   true,
-		CheckType: rq.CheckType,
 		Code:      code,
 		Timestamp: timestamp.Unix(),
 		Count:     1,
@@ -301,8 +302,8 @@ func TestSendCodeForExistUser(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	sendCode, err := controller.Handler("/sendCode")
@@ -311,9 +312,8 @@ func TestSendCodeForExistUser(t *testing.T) {
 	}
 
 	rq := SendCodeRq{
-		Type:      notification.Email,
-		CheckType: notification.Auth,
-		Value:     "test@test.com",
+		Type:  notification.Email,
+		Value: "test@test.com",
 	}
 
 	nowTimestamp := time.Date(2020, time.May, 19, 1, 10, 3, 4, time.UTC)
@@ -326,10 +326,10 @@ func TestSendCodeForExistUser(t *testing.T) {
 	defer patchCode.Unpatch()
 
 	existAuth := &db.Auth{
-		Value:     rq.Value,
-		Type:      rq.Type,
-		IsValid:   false,
-		CheckType: rq.CheckType,
+		Value:   rq.Value,
+		Type:    rq.Type,
+		IsValid: false,
+
 		Code:      "old",
 		Timestamp: rqTimestamp.Unix(),
 		Count:     2,
@@ -338,7 +338,7 @@ func TestSendCodeForExistUser(t *testing.T) {
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
-	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type, rq.CheckType).Return(existAuth, nil)
+	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type).Return(existAuth, nil)
 
 	newAuth := *existAuth
 	newAuth.Code = newCode
@@ -347,7 +347,7 @@ func TestSendCodeForExistUser(t *testing.T) {
 	newAuth.Attempts = 0
 	newAuth.IsValid = true
 
-	mockDb.EXPECT().UpdateByPK(&newAuth).Return(nil)
+	mockDb.EXPECT().UpdateByPK(newAuth.Id, &newAuth).Return(nil)
 	mockNotificator.EXPECT().SendCode(rq.Value, newCode).Return(nil)
 
 	b, err := json.Marshal(rq)
@@ -365,8 +365,8 @@ func TestSendCodeInvalidTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	sendCode, err := controller.Handler("/sendCode")
@@ -375,9 +375,8 @@ func TestSendCodeInvalidTimeout(t *testing.T) {
 	}
 
 	rq := SendCodeRq{
-		Type:      notification.Email,
-		CheckType: notification.Auth,
-		Value:     "test@test.com",
+		Type:  notification.Email,
+		Value: "test@test.com",
 	}
 
 	nowTimestamp := time.Date(2020, time.May, 19, 1, 10, 0, 0, time.UTC)
@@ -393,7 +392,6 @@ func TestSendCodeInvalidTimeout(t *testing.T) {
 		Value:     rq.Value,
 		Type:      rq.Type,
 		IsValid:   false,
-		CheckType: rq.CheckType,
 		Code:      "old",
 		Timestamp: rqTimestamp.Unix(),
 		Count:     2,
@@ -402,7 +400,7 @@ func TestSendCodeInvalidTimeout(t *testing.T) {
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
-	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type, rq.CheckType).Return(existAuth, nil)
+	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type).Return(existAuth, nil)
 
 	b, err := json.Marshal(rq)
 	if err != nil {
@@ -419,8 +417,8 @@ func TestSendCodeMaxCount(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	sendCode, err := controller.Handler("/sendCode")
@@ -429,9 +427,9 @@ func TestSendCodeMaxCount(t *testing.T) {
 	}
 
 	rq := SendCodeRq{
-		Type:      notification.Email,
-		CheckType: notification.Auth,
-		Value:     "test@test.com",
+		Type: notification.Email,
+
+		Value: "test@test.com",
 	}
 
 	nowTimestamp := time.Date(2020, time.May, 19, 1, 10, 0, 0, time.UTC)
@@ -444,10 +442,10 @@ func TestSendCodeMaxCount(t *testing.T) {
 	defer patchCode.Unpatch()
 
 	existAuth := &db.Auth{
-		Value:     rq.Value,
-		Type:      rq.Type,
-		IsValid:   false,
-		CheckType: rq.CheckType,
+		Value:   rq.Value,
+		Type:    rq.Type,
+		IsValid: false,
+
 		Code:      "old",
 		Timestamp: rqTimestamp.Unix(),
 		Count:     5,
@@ -456,7 +454,7 @@ func TestSendCodeMaxCount(t *testing.T) {
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
-	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type, rq.CheckType).Return(existAuth, nil)
+	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type).Return(existAuth, nil)
 
 	b, err := json.Marshal(rq)
 	if err != nil {
@@ -473,8 +471,8 @@ func TestSendCodeResetCodeCount(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	sendCode, err := controller.Handler("/sendCode")
@@ -483,9 +481,9 @@ func TestSendCodeResetCodeCount(t *testing.T) {
 	}
 
 	rq := SendCodeRq{
-		Type:      notification.Email,
-		CheckType: notification.Auth,
-		Value:     "test@test.com",
+		Type: notification.Email,
+
+		Value: "test@test.com",
 	}
 
 	nowTimestamp := time.Date(2020, time.May, 19, 2, 1, 0, 0, time.UTC)
@@ -498,10 +496,10 @@ func TestSendCodeResetCodeCount(t *testing.T) {
 	defer patchCode.Unpatch()
 
 	existAuth := &db.Auth{
-		Value:     rq.Value,
-		Type:      rq.Type,
-		IsValid:   false,
-		CheckType: rq.CheckType,
+		Value:   rq.Value,
+		Type:    rq.Type,
+		IsValid: false,
+
 		Code:      "old",
 		Timestamp: rqTimestamp.Unix(),
 		Count:     10,
@@ -510,7 +508,7 @@ func TestSendCodeResetCodeCount(t *testing.T) {
 
 	mockNotificator.EXPECT().Format(rq.Value).Return(rq.Value)
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
-	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type, rq.CheckType).Return(existAuth, nil)
+	mockDb.EXPECT().AuthByValue(rq.Value, rq.Type).Return(existAuth, nil)
 
 	newAuth := *existAuth
 	newAuth.Code = newCode
@@ -519,7 +517,7 @@ func TestSendCodeResetCodeCount(t *testing.T) {
 	newAuth.Attempts = 0
 	newAuth.IsValid = true
 
-	mockDb.EXPECT().UpdateByPK(&newAuth).Return(nil)
+	mockDb.EXPECT().UpdateByPK(newAuth.Id, &newAuth).Return(nil)
 	mockNotificator.EXPECT().SendCode(rq.Value, newCode).Return(nil)
 
 	b, err := json.Marshal(rq)
@@ -538,8 +536,8 @@ func TestSignForNewUser(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	code := "111111"
@@ -567,7 +565,7 @@ func TestSignForNewUser(t *testing.T) {
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
 
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
-	mockDb.EXPECT().ProfileById(id).Return(nil, db.ErrNoRows)
+	mockDb.EXPECT().ProfileByAuthId(id).Return(nil, db.ErrNoRows)
 	mockDb.EXPECT().ProfileByPhoneNumber(rq.Value).Return(nil, db.ErrNoRows)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 2, 3, 4, time.UTC)
@@ -579,38 +577,39 @@ func TestSignForNewUser(t *testing.T) {
 			return nil
 		})
 	defer patchVerify.Unpatch()
-	mockDb.EXPECT().AddressIsExist(rq.Addresses[types.Polkadot].Address).Return(false, nil).Times(1)
-	mockDb.EXPECT().AddressIsExist(rq.Addresses[types.Kusama].Address).Return(false, nil).Times(1)
+	mockDb.EXPECT().ProfileByAddress(types.Polkadot, rq.Addresses[types.Polkadot].Address).Return(nil, db.ErrNoRows).Times(1)
+	mockDb.EXPECT().ProfileByAddress(types.Kusama, rq.Addresses[types.Kusama].Address).Return(nil, db.ErrNoRows).Times(1)
 
+	dbId := db.NewId()
+	patchId := monkey.Patch(primitive.NewObjectID, func() primitive.ObjectID { return primitive.ObjectID(dbId) })
+	defer patchId.Unpatch()
+
+	addresses := map[types.Network]db.Address{
+		types.Polkadot: {
+			Address: rq.Addresses[types.Polkadot].Address,
+		},
+		types.Kusama: {
+			Address: rq.Addresses[types.Kusama].Address,
+		},
+	}
 	profile := &db.Profile{
-		Id:          id,
-		IsMigratory: false,
+		Id:          dbId,
+		AuthId:      id,
 		PhoneNumber: rq.Value,
 		Username:    "fractapper10",
+		Addresses:   addresses,
 	}
-	addresses := []*db.Address{
-		{
-			Id:      id,
-			Address: rq.Addresses[types.Polkadot].Address,
-			Network: types.Polkadot,
-		},
-		{
-			Id:      id,
-			Address: rq.Addresses[types.Kusama].Address,
-			Network: types.Kusama,
-		},
-	}
-	mockDb.EXPECT().ProfilesCount().Return(10, nil)
-	mockDb.EXPECT().CreateProfile(ctx, gomock.Eq(profile), gomock.Eq(addresses)).Return(nil)
-	mockDb.EXPECT().TokenById(id).Return("", db.ErrNoRows)
+	mockDb.EXPECT().ProfilesCount().Return(int64(10), nil)
+	mockDb.EXPECT().Insert(profile).Return(nil)
+	mockDb.EXPECT().TokenByProfileId(profile.Id).Return(nil, db.ErrNoRows)
 
 	_, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": id, "timestamp": timestamp.Unix()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	mockDb.EXPECT().Insert(&db.Token{Token: tokenString, Id: id}).Return(nil)
+	mockDb.EXPECT().Insert(&db.Token{Id: db.NewId(), Token: tokenString, ProfileId: profile.Id}).Return(nil)
 
-	signIn, err := controller.Handler("/signIn")
+	signIn, err := controller.Handler("/signin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,12 +639,13 @@ func TestSignForNewUser(t *testing.T) {
 
 	assert.Assert(t, token.Token == tokenString)
 }
+
 func TestSignForInvalidSignTimestamp(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	c := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	code := "111111"
@@ -673,14 +673,14 @@ func TestSignForInvalidSignTimestamp(t *testing.T) {
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
 
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
-	mockDb.EXPECT().ProfileById(id).Return(nil, db.ErrNoRows)
+	mockDb.EXPECT().ProfileByAuthId(id).Return(nil, db.ErrNoRows)
 	mockDb.EXPECT().ProfileByPhoneNumber(rq.Value).Return(nil, db.ErrNoRows)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 10, 1, 0, time.UTC)
 	patchTime := monkey.Patch(time.Now, func() time.Time { return timestamp })
 	defer patchTime.Unpatch()
 
-	signIn, err := c.Handler("/signIn")
+	signIn, err := c.Handler("/signin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,12 +704,13 @@ func TestSignForInvalidSignTimestamp(t *testing.T) {
 
 	assert.Assert(t, err == controller.InvalidSignTimeErr)
 }
+
 func TestSignWithExistUserForAddress(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 
-	mockDb := mocks.NewMockDB(ctrl)
-	mockNotificator := mocks.NewMockNotificator(ctrl)
+	mockDb := dbMock.NewMockDB(ctrl)
+	mockNotificator := notificationMock.NewMockNotificator(ctrl)
 	controller := NewController(mockDb, mockNotificator, mockNotificator, tokenAuth)
 
 	code := "111111"
@@ -738,11 +739,26 @@ func TestSignWithExistUserForAddress(t *testing.T) {
 	mockNotificator.EXPECT().Validate(rq.Value).Return(nil)
 	mockConfirmCode(mockDb, rq.Value, code, rq.Type)
 
-	profile := &db.Profile{
-		Id:          id,
-		IsMigratory: false,
+	dbId := db.NewId()
+	patchId := monkey.Patch(primitive.NewObjectID, func() primitive.ObjectID { return primitive.ObjectID(dbId) })
+	defer patchId.Unpatch()
+
+	addresses := map[types.Network]db.Address{
+		types.Polkadot: {
+			Address: rq.Addresses[types.Polkadot].Address,
+		},
+		types.Kusama: {
+			Address: rq.Addresses[types.Kusama].Address,
+		},
 	}
-	mockDb.EXPECT().ProfileById(id).Return(profile, nil)
+	profile := &db.Profile{
+		Id:          dbId,
+		AuthId:      id,
+		PhoneNumber: rq.Value,
+		Username:    "fractapper10",
+		Addresses:   addresses,
+	}
+	mockDb.EXPECT().ProfileByAuthId(id).Return(profile, nil).Times(2)
 	mockDb.EXPECT().ProfileByEmail(rq.Value).Return(nil, db.ErrNoRows)
 
 	timestamp := time.Date(2020, time.May, 19, 1, 2, 3, 4, time.UTC)
@@ -754,36 +770,27 @@ func TestSignWithExistUserForAddress(t *testing.T) {
 			return nil
 		})
 	defer patchVerify.Unpatch()
-	mockDb.EXPECT().AddressIsExist(rq.Addresses[types.Polkadot].Address).Return(false, nil).Times(1)
-	mockDb.EXPECT().AddressIsExist(rq.Addresses[types.Kusama].Address).Return(false, nil).Times(1)
+	mockDb.EXPECT().ProfileByAddress(types.Polkadot, rq.Addresses[types.Polkadot].Address).Return(nil, nil).Times(1)
+	mockDb.EXPECT().ProfileByAddress(types.Kusama, rq.Addresses[types.Kusama].Address).Return(nil, nil).Times(1)
 
-	addresses := []db.Address{
-		{
-			Id:      id,
-			Address: rq.Addresses[types.Polkadot].Address,
-			Network: types.Polkadot,
-		},
-		{
-			Id:      id,
-			Address: rq.Addresses[types.Kusama].Address,
-			Network: types.Kusama,
-		},
-	}
-	mockDb.EXPECT().CreateProfile(ctx, gomock.Eq(profile), gomock.Eq(addresses)).Return(nil)
+	mockDb.EXPECT().UpdateByPK(profile.Id, profile).Return(nil)
 
 	_, tokenString, err := tokenAuth.Encode(map[string]interface{}{"id": id, "timestamp": timestamp.Unix()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	mockDb.EXPECT().TokenById(id).Return(tokenString, nil)
-	mockDb.EXPECT().AddressesById(id).Return(addresses, nil)
+
+	token := db.Token{Id: dbId, Token: tokenString, ProfileId: profile.Id}
+	mockDb.EXPECT().TokenByProfileId(profile.Id).Return(&token, nil)
 
 	newProfile := *profile
 	newProfile.Email = rq.Value
-	mockDb.EXPECT().UpdateByPK(&newProfile).Return(nil).Times(1)
-	mockDb.EXPECT().UpdateByPK(&db.Token{Token: tokenString, Id: id}).Return(nil).Times(1)
+	newToken := token
+	newToken.Token = tokenString
+	mockDb.EXPECT().UpdateByPK(newProfile.Id, newProfile).Return(nil).Times(1)
+	mockDb.EXPECT().UpdateByPK(dbId, &newToken).Return(nil).Times(1)
 
-	signIn, err := controller.Handler("/signIn")
+	signIn, err := controller.Handler("/signin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -805,8 +812,7 @@ func TestSignWithExistUserForAddress(t *testing.T) {
 
 	assert.Assert(t, err == nil)
 
-	token := &TokenRs{Token: tokenString}
-	err = json.Unmarshal(w.Body.Bytes(), token)
+	err = json.Unmarshal(w.Body.Bytes(), &token)
 	if err != nil {
 		t.Fatal(err)
 	}

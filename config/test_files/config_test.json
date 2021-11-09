@@ -1,23 +1,15 @@
 {
-  "SubstrateUrls": {
-    "Polkadot": "polkadotUrlTest",
-    "Kusama": "kusamaUrlTest"
-  },
+  "TransactionApi": "txApi",
+  "BinanceApi": "binanceApi",
   "Firebase": {
-    "ProjectId": "projectId",
-    "WithCredentialsFile": "credential"
+    "ProjectId": "projectId"
   },
   "SMSService": {
     "FromNumber": "number",
     "AccountSid": "sid",
     "AuthToken": "auth"
   },
-  "DB": {
-    "Host": "host",
-    "User": "user",
-    "Password": "password",
-    "Database": "database"
-  },
+  "DBConnectionString": "dbConnection",
   "Secret": "secret",
   "SMTP": {
     "Host": "host",

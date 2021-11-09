@@ -1,6 +1,9 @@
 package profile
 
-import "fractapp-server/types"
+import (
+	"fractapp-server/db"
+	"fractapp-server/types"
+)
 
 type UpdateProfileRq struct {
 	Name     string
@@ -26,8 +29,13 @@ type ShortUserProfile struct {
 	Addresses  map[types.Network]string `json:"addresses"`  // String addresses by network (0 - polkadot/ 1 - kusama) from account
 }
 
-type TxStatusRs struct {
+type TxStatusScannerApiRs struct {
 	Status int64 `json:"status"`
+}
+
+type TxStatusRs struct {
+	Hash   string `json:"hash"`
+	Status int64  `json:"status"`
 }
 
 type MyContacts map[string]ShortUserProfile // map with id->short user userInfo
@@ -37,28 +45,28 @@ type UpdateFirebaseTokenRq struct {
 }
 
 type Transaction struct {
-	ID        string `json:"id"`
-	Hash      string `json:"hash"`
-	Action    int64  `json:"action"`
-	Currency  int    `json:"currency"`
-	To        string `json:"to"`
-	From      string `json:"from"`
-	Value     string `json:"value"`
-	Fee       string `json:"fee"`
-	Timestamp int64  `json:"timestamp"`
-	Status    int64  `json:"status"`
+	ID        string         `json:"id"`
+	Hash      string         `json:"hash"`
+	Action    db.TxAction    `json:"action"`
+	Currency  types.Currency `json:"currency"`
+	To        string         `json:"to"`
+	From      string         `json:"from"`
+	Value     string         `json:"value"`
+	Fee       string         `json:"fee"`
+	Timestamp int64          `json:"timestamp"`
+	Status    db.Status      `json:"status"`
 }
 
-type TransactionRs struct {
+type OldTransactionRs struct {
 	ID   string `json:"id"`
 	Hash string `json:"hash"`
 
-	Currency int `json:"currency"`
+	Currency types.Currency `json:"currency"`
 
 	From     string `json:"from"`
 	UserFrom string `json:"userFrom"`
 
-	Action int64 `json:"action"`
+	Action db.TxAction `json:"action"`
 
 	To     string `json:"to"`
 	UserTo string `json:"userTo"`
@@ -67,6 +75,6 @@ type TransactionRs struct {
 	Fee   string  `json:"fee"`
 	Price float32 `json:"price"`
 
-	Timestamp int64 `json:"timestamp"`
-	Status    int64 `json:"status"`
+	Timestamp int64     `json:"timestamp"`
+	Status    db.Status `json:"status"`
 }

@@ -11,6 +11,5 @@ type Price struct {
 	Value    float32        `json:"value"`
 }
 type TotalInfo struct {
-	SubstrateUrls []SubstrateUrl `json:"substrateUrls"`
-	Prices        []Price        `json:"prices"`
+	Prices []Price `json:"prices"`
 }

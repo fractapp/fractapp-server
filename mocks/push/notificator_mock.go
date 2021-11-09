@@ -48,30 +48,16 @@ func (mr *MockNotificatorMockRecorder) Notify(title, msg, token interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockNotificator)(nil).Notify), title, msg, token)
 }
 
-// MsgForAuthed mocks base method
-func (m *MockNotificator) MsgForAuthed(txType push.TxType, amount float64, currency types.Currency) string {
+// CreateMsg mocks base method
+func (m *MockNotificator) CreateMsg(txType push.TxType, amount, usdAmount float64, currency types.Currency) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MsgForAuthed", txType, amount, currency)
+	ret := m.ctrl.Call(m, "CreateMsg", txType, amount, usdAmount, currency)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-// MsgForAuthed indicates an expected call of MsgForAuthed
-func (mr *MockNotificatorMockRecorder) MsgForAuthed(txType, amount, currency interface{}) *gomock.Call {
+// CreateMsg indicates an expected call of CreateMsg
+func (mr *MockNotificatorMockRecorder) CreateMsg(txType, amount, usdAmount, currency interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MsgForAuthed", reflect.TypeOf((*MockNotificator)(nil).MsgForAuthed), txType, amount, currency)
-}
-
-// MsgForAddress mocks base method
-func (m *MockNotificator) MsgForAddress(address string, txType push.TxType, amount float64, currency types.Currency) string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MsgForAddress", address, txType, amount, currency)
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// MsgForAddress indicates an expected call of MsgForAddress
-func (mr *MockNotificatorMockRecorder) MsgForAddress(address, txType, amount, currency interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MsgForAddress", reflect.TypeOf((*MockNotificator)(nil).MsgForAddress), address, txType, amount, currency)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMsg", reflect.TypeOf((*MockNotificator)(nil).CreateMsg), txType, amount, usdAmount, currency)
 }
