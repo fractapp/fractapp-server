@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,6 +23,7 @@ import (
 	"bou.ke/monkey"
 
 	"github.com/go-chi/jwtauth"
+	"github.com/gorilla/websocket"
 
 	"gotest.tools/assert"
 
@@ -450,7 +452,7 @@ func TestBalance(t *testing.T) {
 	})
 }
 
-func TestJWTAuthPositive(t *testing.T) {
+func TestJWTAuth(t *testing.T) {
 	controller, _, tokenAuth := newController(t)
 
 	authId := "authId"
@@ -478,4 +480,58 @@ func TestJWTAuthPositive(t *testing.T) {
 	assert.Equal(t, tokenString, tokenMock)
 	assert.Equal(t, authId, authIdOne)
 	assert.Equal(t, profileId, profileIdOne)
+}
+
+func TestSendWsData(t *testing.T) {
+	controller, _, _ := newController(t)
+
+	p := &db.Profile{
+		Id:       db.NewId(),
+		AuthId:   "authId",
+		Username: "fractapper10",
+		Addresses: map[types.Network]db.Address{
+			types.Polkadot: {
+				Address: "111111111111111111111111111111111HC1",
+			},
+			types.Kusama: {
+				Address: "CaKWz5omakTK7ovp4m3koXrHyHb7NG3Nt7GENHbviByZpKp",
+			},
+		},
+	}
+
+	var upgrader = websocket.Upgrader{}
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true //TODO: security?
+	}
+
+	rq, err := http.NewRequest("POST", "test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	connection, _ := upgrader.Upgrade(w, rq, nil)
+
+	u := &UserData{
+		Conn:  connection,
+		Mutex: &sync.Mutex{},
+	}
+	controller.connections.Store(p.AuthId, u)
+
+	data := &WsResponse{
+		Method: updateMethod,
+	}
+
+	var dataMock interface{}
+	sendPatch := monkey.PatchInstanceMethod(reflect.TypeOf(u.Conn), "WriteJSON", func(c *websocket.Conn, data interface{}) error {
+		dataMock = data
+
+		return nil
+	})
+	defer sendPatch.Unpatch()
+
+	err = controller.SendWsData(data, p.AuthId)
+
+	assert.Equal(t, err, nil)
+	assert.DeepEqual(t, data, dataMock)
 }
