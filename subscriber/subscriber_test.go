@@ -8,7 +8,6 @@ import (
 	"fractapp-server/controller/profile"
 	"fractapp-server/db"
 	dbMock "fractapp-server/mocks/db"
-	pushMock "fractapp-server/mocks/push"
 	"fractapp-server/push"
 	"fractapp-server/types"
 	"io/ioutil"
@@ -28,7 +27,7 @@ import (
 
 func TestMainRoute(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	controller := NewController(dbMock.NewMockDB(ctrl), pushMock.NewMockNotificator(ctrl))
+	controller := NewController(dbMock.NewMockDB(ctrl))
 	assert.Equal(t, controller.MainRoute(), "/")
 }
 
@@ -43,7 +42,7 @@ func testErr(t *testing.T, controller *Controller, err error) {
 }
 func TestReturnErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	controller := NewController(dbMock.NewMockDB(ctrl), pushMock.NewMockNotificator(ctrl))
+	controller := NewController(dbMock.NewMockDB(ctrl))
 
 	testErr(t, controller, errors.New("any errors"))
 }
@@ -52,8 +51,7 @@ func TestTransactionTransfer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := dbMock.NewMockDB(ctrl)
-	notificator := pushMock.NewMockNotificator(ctrl)
-	controller := NewController(mockDb, notificator)
+	controller := NewController(mockDb)
 
 	routeFn, err := controller.Handler("/notify")
 	if err != nil {
@@ -184,12 +182,9 @@ func TestTransactionTransfer(t *testing.T) {
 	fAmount, _ := currency.ConvertFromPlanck(amount).Float64()
 	usdAmount := fAmount * float64(price)
 
-	sentMsg := fmt.Sprintf("sent msg %f %f %s", fAmount, usdAmount, currency.String())
-	notificator.EXPECT().CreateMsg(push.Sent, fAmount, usdAmount, currency).
-		Return(sentMsg)
-	receivedMsg := fmt.Sprintf("receiver msg %f %f %s", fAmount, usdAmount, currency.String())
-	notificator.EXPECT().CreateMsg(push.Received, fAmount, usdAmount, currency).
-		Return(receivedMsg)
+	sentMsg := push.CreateMsg(push.Sent, fAmount, usdAmount, currency)
+
+	receivedMsg := push.CreateMsg(push.Received, fAmount, usdAmount, currency)
 
 	notifications := make([]interface{}, 0)
 	notifications = append(notifications, &db.Notification{
@@ -221,8 +216,7 @@ func TestTransactionStakingReward(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockDb := dbMock.NewMockDB(ctrl)
-	notificator := pushMock.NewMockNotificator(ctrl)
-	controller := NewController(mockDb, notificator)
+	controller := NewController(mockDb)
 
 	routeFn, err := controller.Handler("/notify")
 	if err != nil {
@@ -322,9 +316,7 @@ func TestTransactionStakingReward(t *testing.T) {
 	fAmount, _ := currency.ConvertFromPlanck(amount).Float64()
 	usdAmount := fAmount * float64(price)
 
-	receivedMsg := fmt.Sprintf("receiver msg %f %f %s", fAmount, usdAmount, currency.String())
-	notificator.EXPECT().CreateMsg(push.Received, fAmount, usdAmount, currency).
-		Return(receivedMsg)
+	receivedMsg := push.CreateMsg(push.Received, fAmount, usdAmount, currency)
 
 	mockDb.EXPECT().Insert(&db.Notification{
 		Id:        db.NewId(),

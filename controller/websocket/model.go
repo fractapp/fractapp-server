@@ -34,7 +34,6 @@ type WsResponse struct {
 
 type Update struct {
 	Transactions  map[types.Currency][]*message.TransactionRs `json:"transactions"`
-	Balances      map[types.Currency]*substrate.Balance       `json:"balances"`
 	Messages      []*message.MessageRs                        `json:"messages"`
 	Users         map[string]profile.ShortUserProfile         `json:"users"`
 	Notifications []string                                    `json:"notifications"`

@@ -6,7 +6,6 @@ import (
 	"fractapp-server/config"
 	"fractapp-server/controller"
 	"fractapp-server/db"
-	"fractapp-server/push"
 	"fractapp-server/subscriber"
 	"net/http"
 	"os"
@@ -42,11 +41,6 @@ func main() {
 		log.Fatalf("Invalid parse config: %s", err.Error())
 	}
 
-	notificator, err := push.NewClient(ctx, "firebase.json", config.Firebase.ProjectId)
-	if err != nil {
-		log.Fatalf("Invalid create notificator: %s", err.Error())
-	}
-
 	//TODO: add ctx with timeout
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(config.DBConnectionString))
 	if err != nil {
@@ -77,7 +71,7 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	subController := subscriber.NewController(database, notificator)
+	subController := subscriber.NewController(database)
 	r.Group(func(r chi.Router) {
 		r.Route(subController.MainRoute(), func(r chi.Router) {
 			r.Post(subscriber.NotifyRoute, controller.Route(subController, subscriber.NotifyRoute))

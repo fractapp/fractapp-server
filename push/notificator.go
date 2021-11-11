@@ -22,7 +22,6 @@ const (
 
 type Notificator interface {
 	Notify(title string, msg string, token string) error
-	CreateMsg(txType TxType, amount float64, usdAmount float64, currency types.Currency) string
 }
 
 type Client struct {
@@ -67,7 +66,7 @@ func (n *Client) Notify(title string, msg string, token string) error {
 	}
 	return nil
 }
-func (n *Client) CreateMsg(txType TxType, amount float64, usdAmount float64, currency types.Currency) string {
+func CreateMsg(txType TxType, amount float64, usdAmount float64, currency types.Currency) string {
 	amountMsg := fmt.Sprintf("%.2f (%.4f %s)", usdAmount, amount, currency.String())
 	if usdAmount/100 < 1 {
 		amountMsg = fmt.Sprintf("%.4f %s", amount, currency.String())

@@ -1,0 +1,23 @@
+{
+  "TransactionApi": "http://scanner-api-1:3000",
+  "BinanceApi": "api.binance.com",
+  "Firebase": {
+    "ProjectId": "fractapp-local"
+  },
+  "SMSService": {
+    "FromNumber": "",
+    "AccountSid": "",
+    "AuthToken": ""
+  },
+  "DBConnectionString": "mongodb://admin:password@127.0.0.1:27017/fractapp?authSource=admin&readPreference=primary&ssl=false",
+  "Secret": "123123",
+  "SMTP": {
+    "Host": "smtp.gmail.com:587",
+    "Password": "",
+    "From": {
+      "Name": "",
+      "Address": ""
+    }
+  }
+}
+

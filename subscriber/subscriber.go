@@ -17,14 +17,12 @@ import (
 const NotifyRoute = "/notify"
 
 type Controller struct {
-	db          db.DB
-	notificator push.Notificator
+	db db.DB
 }
 
-func NewController(db db.DB, notificator push.Notificator) *Controller {
+func NewController(db db.DB) *Controller {
 	return &Controller{
-		db:          db,
-		notificator: notificator,
+		db: db,
 	}
 }
 
@@ -43,7 +41,7 @@ func (c *Controller) Handler(route string) (func(w http.ResponseWriter, r *http.
 func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 	switch err {
 	default:
-		log.Errorf("Error: %d \n", err)
+		log.Errorf("Error: %d", err)
 		http.Error(w, "", http.StatusBadRequest)
 	}
 }
@@ -200,7 +198,7 @@ func (c *Controller) notifyRoute(w http.ResponseWriter, r *http.Request) error {
 				notifications = append(notifications, &db.Notification{
 					Id:        db.NewId(),
 					Title:     receiverTitle,
-					Message:   c.notificator.CreateMsg(push.Sent, fAmount, usdAmount, currency),
+					Message:   push.CreateMsg(push.Sent, fAmount, usdAmount, currency),
 					Type:      db.TransactionNotificationType,
 					TargetId:  senderTx.Id,
 					UserId:    senderProfile.Id,
@@ -212,7 +210,7 @@ func (c *Controller) notifyRoute(w http.ResponseWriter, r *http.Request) error {
 				notifications = append(notifications, db.Notification{
 					Id:        db.NewId(),
 					Title:     senderTitle,
-					Message:   c.notificator.CreateMsg(push.Received, fAmount, usdAmount, currency),
+					Message:   push.CreateMsg(push.Received, fAmount, usdAmount, currency),
 					Type:      db.TransactionNotificationType,
 					TargetId:  receiverTx.Id,
 					UserId:    receiverProfile.Id,
@@ -220,15 +218,17 @@ func (c *Controller) notifyRoute(w http.ResponseWriter, r *http.Request) error {
 				})
 			}
 
-			err = c.db.InsertMany(notifications)
-			if err != nil {
-				return err
+			if len(notifications) > 0 {
+				err = c.db.InsertMany(notifications)
+				if err != nil {
+					return err
+				}
 			}
 		} else if v.Action == db.StakingReward && receiverTx != nil && receiverProfile != nil {
 			notification := &db.Notification{
 				Id:        db.NewId(),
 				Title:     "Deposit payout",
-				Message:   c.notificator.CreateMsg(push.Received, fAmount, usdAmount, currency),
+				Message:   push.CreateMsg(push.Received, fAmount, usdAmount, currency),
 				Type:      db.TransactionNotificationType,
 				TargetId:  receiverTx.Id,
 				UserId:    receiverProfile.Id,
