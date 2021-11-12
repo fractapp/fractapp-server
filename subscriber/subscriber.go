@@ -120,6 +120,7 @@ func (c *Controller) notifyRoute(w http.ResponseWriter, r *http.Request) error {
 					MemberId:      receiverId,
 					Owner:         *senderId,
 					Direction:     db.OutDirection,
+					Action:        v.Action,
 					Status:        v.Status,
 					Value:         v.Value,
 					Fee:           v.Fee,
@@ -142,6 +143,7 @@ func (c *Controller) notifyRoute(w http.ResponseWriter, r *http.Request) error {
 				MemberId:      senderId,
 				Owner:         *receiverId,
 				Direction:     db.InDirection,
+				Action:        v.Action,
 				Status:        v.Status,
 				Value:         v.Value,
 				Fee:           v.Fee,
@@ -166,7 +168,7 @@ func (c *Controller) notifyRoute(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 
-		if v.Action != db.Transfer && v.Action != db.StakingReward {
+		if v.Action != db.Transfer && v.Action != db.StakingReward && v.Action != db.StakingWithdrawn {
 			continue
 		}
 
