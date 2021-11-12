@@ -304,7 +304,6 @@ func TestTransactionStakingReward(t *testing.T) {
 		Owner:         userTo.Id,
 		Action:        v.Action,
 		Direction:     db.InDirection,
-		Action:        v.Action,
 		Status:        v.Status,
 		Value:         v.Value,
 		Fee:           v.Fee,
