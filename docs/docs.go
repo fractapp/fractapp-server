@@ -178,6 +178,47 @@ var doc = `{
         },
         "/message/read": {
             "post": {
+                "description": "read messages",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Message"
+                ],
+                "summary": "Read messages",
+                "operationId": "read",
+                "parameters": [
+                    {
+                        "description": "array of message ids",
+                        "name": "rq",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/message/send": {
+            "post": {
                 "description": "send message",
                 "consumes": [
                     "application/json"
@@ -189,7 +230,7 @@ var doc = `{
                     "Message"
                 ],
                 "summary": "send message",
-                "operationId": "read",
+                "operationId": "send",
                 "parameters": [
                     {
                         "description": "send message body",
@@ -203,7 +244,10 @@ var doc = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/message.SendInfo"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -232,46 +276,8 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/message.MessagesAndUsersRs"
+                            "$ref": "#/definitions/message.MessagesAndTxs"
                         }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/notification/subscribe": {
-            "post": {
-                "description": "subscribe for notifications about transaction",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Notification"
-                ],
-                "summary": "Subscribe",
-                "operationId": "subscribe",
-                "parameters": [
-                    {
-                        "description": "update token request",
-                        "name": "rq",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/profile.UpdateFirebaseTokenRq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
                     },
                     "400": {
                         "description": "Bad Request",
@@ -344,6 +350,44 @@ var doc = `{
                                 "type": "string"
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/firebase/update": {
+            "post": {
+                "description": "subscribe for notifications about transaction",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Subscribe for notifications about transaction",
+                "operationId": "subscribe",
+                "parameters": [
+                    {
+                        "description": "update token request",
+                        "name": "rq",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/profile.UpdateFirebaseTokenRq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
                     },
                     "400": {
                         "description": "Bad Request",
@@ -818,7 +862,7 @@ var doc = `{
         },
         "/substrate/base": {
             "get": {
-                "description": "calculate fee",
+                "description": "substrate base",
                 "consumes": [
                     "application/json"
                 ],
@@ -828,13 +872,13 @@ var doc = `{
                 "tags": [
                     "Substrate"
                 ],
-                "summary": "Get tx base",
-                "operationId": "txBase",
+                "summary": "Get substrate base",
+                "operationId": "base",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "sender",
-                        "name": "sender",
+                        "type": "integer",
+                        "description": "network",
+                        "name": "network",
                         "in": "query",
                         "required": true
                     }
@@ -843,7 +887,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/substrate.TxBase"
+                            "$ref": "#/definitions/substrate.Base"
                         }
                     },
                     "400": {
@@ -918,6 +962,59 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "description": "tx",
+                        "name": "tx",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "network",
+                        "name": "network",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.FeeInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/substrate/transfer/fee": {
+            "get": {
+                "description": "calculate transferFee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "Calculate transferFee",
+                "operationId": "transferFee",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "tx",
+                        "name": "tx",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
                         "description": "sender",
                         "name": "sender",
                         "in": "query",
@@ -939,8 +1036,15 @@ var doc = `{
                     },
                     {
                         "type": "integer",
-                        "description": "currency",
-                        "name": "currency",
+                        "description": "network",
+                        "name": "network",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "isFullBalance",
+                        "name": "isFullBalance",
                         "in": "query",
                         "required": true
                     }
@@ -950,6 +1054,52 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/substrate.FeeInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/substrate/txBase": {
+            "get": {
+                "description": "calculate fee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Substrate"
+                ],
+                "summary": "Get tx base",
+                "operationId": "txBase",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sender",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "network",
+                        "name": "network",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/substrate.TxBase"
                         }
                     },
                     "400": {
@@ -999,7 +1149,8 @@ var doc = `{
                     "type": "integer",
                     "enum": [
                         0,
-                        1
+                        1,
+                        2
                     ]
                 },
                 "value": {
@@ -1041,8 +1192,8 @@ var doc = `{
                     "type": "string"
                 },
                 "arguments": {
-                    "type": "array",
-                    "items": {
+                    "type": "object",
+                    "additionalProperties": {
                         "type": "string"
                     }
                 },
@@ -1065,6 +1216,53 @@ var doc = `{
                 }
             }
         },
+        "db.Transaction": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "integer"
+                },
+                "currency": {
+                    "type": "integer"
+                },
+                "direction": {
+                    "type": "integer"
+                },
+                "fee": {
+                    "type": "string"
+                },
+                "hash": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "memberAddress": {
+                    "type": "string"
+                },
+                "memberId": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "txId": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "info.Price": {
             "type": "object",
             "properties": {
@@ -1076,17 +1274,6 @@ var doc = `{
                 }
             }
         },
-        "info.SubstrateUrl": {
-            "type": "object",
-            "properties": {
-                "network": {
-                    "type": "integer"
-                },
-                "url": {
-                    "type": "string"
-                }
-            }
-        },
         "info.TotalInfo": {
             "type": "object",
             "properties": {
@@ -1094,12 +1281,6 @@ var doc = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/info.Price"
-                    }
-                },
-                "substrateUrls": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/info.SubstrateUrl"
                     }
                 }
             }
@@ -1111,8 +1292,8 @@ var doc = `{
                     "type": "string"
                 },
                 "args": {
-                    "type": "array",
-                    "items": {
+                    "type": "object",
+                    "additionalProperties": {
                         "type": "string"
                     }
                 },
@@ -1127,9 +1308,6 @@ var doc = `{
                 },
                 "value": {
                     "type": "string"
-                },
-                "version": {
-                    "type": "integer"
                 }
             }
         },
@@ -1140,8 +1318,8 @@ var doc = `{
                     "type": "string"
                 },
                 "args": {
-                    "type": "array",
-                    "items": {
+                    "type": "object",
+                    "additionalProperties": {
                         "type": "string"
                     }
                 },
@@ -1171,7 +1349,7 @@ var doc = `{
                 }
             }
         },
-        "message.MessagesAndUsersRs": {
+        "message.MessagesAndTxs": {
             "type": "object",
             "properties": {
                 "messages": {
@@ -1180,11 +1358,25 @@ var doc = `{
                         "$ref": "#/definitions/message.MessageRs"
                     }
                 },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.Transaction"
+                    }
+                },
                 "users": {
                     "type": "object",
                     "additionalProperties": {
                         "$ref": "#/definitions/profile.ShortUserProfile"
                     }
+                }
+            }
+        },
+        "message.SendInfo": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "integer"
                 }
             }
         },
@@ -1260,6 +1452,9 @@ var doc = `{
         "profile.Transaction": {
             "type": "object",
             "properties": {
+                "action": {
+                    "type": "integer"
+                },
                 "currency": {
                     "type": "integer"
                 },
@@ -1292,6 +1487,9 @@ var doc = `{
         "profile.TxStatusRs": {
             "type": "object",
             "properties": {
+                "hash": {
+                    "type": "string"
+                },
                 "status": {
                     "type": "integer"
                 }
@@ -1319,8 +1517,34 @@ var doc = `{
         "substrate.Balance": {
             "type": "object",
             "properties": {
-                "value": {
+                "payableForFee": {
                     "type": "string"
+                },
+                "staking": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "string"
+                },
+                "transferable": {
+                    "type": "string"
+                }
+            }
+        },
+        "substrate.Base": {
+            "type": "object",
+            "properties": {
+                "genesisHash": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "specVersion": {
+                    "type": "integer"
+                },
+                "transactionVersion": {
+                    "type": "integer"
                 }
             }
         },
@@ -1349,19 +1573,7 @@ var doc = `{
                 "blockNumber": {
                     "type": "integer"
                 },
-                "genesisHash": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "type": "string"
-                },
                 "nonce": {
-                    "type": "integer"
-                },
-                "specVersion": {
-                    "type": "integer"
-                },
-                "transactionVersion": {
                     "type": "integer"
                 }
             }

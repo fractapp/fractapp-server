@@ -147,10 +147,10 @@ func (c *Controller) fee(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// fee godoc
-// @Summary Calculate fee
-// @Description calculate fee
-// @ID fee
+// transferFee godoc
+// @Summary Calculate transferFee
+// @Description calculate transferFee
+// @ID transferFee
 // @Tags Substrate
 // @Accept  json
 // @Produce json
@@ -217,10 +217,10 @@ func (c *Controller) transferFee(w http.ResponseWriter, r *http.Request) error {
 // @Accept  json
 // @Produce json
 // @Param sender query string true "sender"
-// @Param sender currency Currency true "currency"
+// @Param network query int64 true "network"
 // @Success 200 {object} TxBase
 // @Failure 400 {string} string
-// @Router /substrate/base [get]
+// @Router /substrate/txBase [get]
 func (c *Controller) txBase(w http.ResponseWriter, r *http.Request) error {
 	sender := r.URL.Query().Get("sender")
 	networkInt, err := strconv.ParseInt(r.URL.Query().Get("network"), 10, 32)
@@ -270,8 +270,8 @@ func (c *Controller) txBase(w http.ResponseWriter, r *http.Request) error {
 // @Tags Substrate
 // @Accept  json
 // @Produce json
-// @Param sender currency Currency true "currency"
-// @Success 200 {object} TxBase
+// @Param network query int64 true "network"
+// @Success 200 {object} Base
 // @Failure 400 {string} string
 // @Router /substrate/base [get]
 func (c *Controller) base(w http.ResponseWriter, r *http.Request) error {

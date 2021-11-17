@@ -26,6 +26,7 @@ definitions:
         enum:
         - 0
         - 1
+        - 2
         type: integer
       value:
         description: Email address or Phone number (without +)
@@ -54,9 +55,9 @@ definitions:
       action:
         type: string
       arguments:
-        items:
+        additionalProperties:
           type: string
-        type: array
+        type: object
       imageUrl:
         type: string
       value:
@@ -69,6 +70,37 @@ definitions:
           $ref: '#/definitions/db.Button'
         type: array
     type: object
+  db.Transaction:
+    properties:
+      action:
+        type: integer
+      currency:
+        type: integer
+      direction:
+        type: integer
+      fee:
+        type: string
+      hash:
+        type: string
+      id:
+        type: string
+      memberAddress:
+        type: string
+      memberId:
+        type: string
+      owner:
+        type: string
+      price:
+        type: number
+      status:
+        type: integer
+      timestamp:
+        type: integer
+      txId:
+        type: string
+      value:
+        type: string
+    type: object
   info.Price:
     properties:
       currency:
@@ -76,22 +108,11 @@ definitions:
       value:
         type: number
     type: object
-  info.SubstrateUrl:
-    properties:
-      network:
-        type: integer
-      url:
-        type: string
-    type: object
   info.TotalInfo:
     properties:
       prices:
         items:
           $ref: '#/definitions/info.Price'
-        type: array
-      substrateUrls:
-        items:
-          $ref: '#/definitions/info.SubstrateUrl'
         type: array
     type: object
   message.MessageRq:
@@ -99,9 +120,9 @@ definitions:
       action:
         type: string
       args:
-        items:
+        additionalProperties:
           type: string
-        type: array
+        type: object
       receiver:
         type: string
       rows:
@@ -110,17 +131,15 @@ definitions:
         type: array
       value:
         type: string
-      version:
-        type: integer
     type: object
   message.MessageRs:
     properties:
       action:
         type: string
       args:
-        items:
+        additionalProperties:
           type: string
-        type: array
+        type: object
       id:
         type: string
       receiver:
@@ -138,16 +157,25 @@ definitions:
       version:
         type: integer
     type: object
-  message.MessagesAndUsersRs:
+  message.MessagesAndTxs:
     properties:
       messages:
         items:
           $ref: '#/definitions/message.MessageRs'
         type: array
+      transactions:
+        items:
+          $ref: '#/definitions/db.Transaction'
+        type: array
       users:
         additionalProperties:
           $ref: '#/definitions/profile.ShortUserProfile'
         type: object
+    type: object
+  message.SendInfo:
+    properties:
+      timestamp:
+        type: integer
     type: object
   profile.MyProfile:
     properties:
@@ -200,6 +228,8 @@ definitions:
     type: object
   profile.Transaction:
     properties:
+      action:
+        type: integer
       currency:
         type: integer
       fee:
@@ -221,6 +251,8 @@ definitions:
     type: object
   profile.TxStatusRs:
     properties:
+      hash:
+        type: string
       status:
         type: integer
     type: object
@@ -238,8 +270,25 @@ definitions:
     type: object
   substrate.Balance:
     properties:
-      value:
+      payableForFee:
         type: string
+      staking:
+        type: string
+      total:
+        type: string
+      transferable:
+        type: string
+    type: object
+  substrate.Base:
+    properties:
+      genesisHash:
+        type: string
+      metadata:
+        type: string
+      specVersion:
+        type: integer
+      transactionVersion:
+        type: integer
     type: object
   substrate.BroadcastResult:
     properties:
@@ -257,15 +306,7 @@ definitions:
         type: string
       blockNumber:
         type: integer
-      genesisHash:
-        type: string
-      metadata:
-        type: string
       nonce:
-        type: integer
-      specVersion:
-        type: integer
-      transactionVersion:
         type: integer
     type: object
 info:
@@ -373,8 +414,35 @@ paths:
     post:
       consumes:
       - application/json
-      description: send message
+      description: read messages
       operationId: read
+      parameters:
+      - description: array of message ids
+        in: body
+        name: rq
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Read messages
+      tags:
+      - Message
+  /message/send:
+    post:
+      consumes:
+      - application/json
+      description: send message
+      operationId: send
       parameters:
       - description: send message body
         in: body
@@ -386,7 +454,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: ""
+          description: OK
+          schema:
+            $ref: '#/definitions/message.SendInfo'
         "400":
           description: Bad Request
           schema:
@@ -406,7 +476,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/message.MessagesAndUsersRs'
+            $ref: '#/definitions/message.MessagesAndTxs'
         "400":
           description: Bad Request
           schema:
@@ -414,31 +484,6 @@ paths:
       summary: Unread messages
       tags:
       - Message
-  /notification/subscribe:
-    post:
-      consumes:
-      - application/json
-      description: subscribe for notifications about transaction
-      operationId: subscribe
-      parameters:
-      - description: update token request
-        in: body
-        name: rq
-        required: true
-        schema:
-          $ref: '#/definitions/profile.UpdateFirebaseTokenRq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: ""
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-      summary: Subscribe
-      tags:
-      - Notification
   /profile/avatar/{userId}:
     get:
       consumes:
@@ -483,6 +528,31 @@ paths:
       security:
       - AuthWithJWT: []
       summary: Get my contacts
+      tags:
+      - Profile
+  /profile/firebase/update:
+    post:
+      consumes:
+      - application/json
+      description: subscribe for notifications about transaction
+      operationId: subscribe
+      parameters:
+      - description: update token request
+        in: body
+        name: rq
+        required: true
+        schema:
+          $ref: '#/definitions/profile.UpdateFirebaseTokenRq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Subscribe for notifications about transaction
       tags:
       - Profile
   /profile/matchContacts:
@@ -789,26 +859,26 @@ paths:
     get:
       consumes:
       - application/json
-      description: calculate fee
-      operationId: txBase
+      description: substrate base
+      operationId: base
       parameters:
-      - description: sender
+      - description: network
         in: query
-        name: sender
+        name: network
         required: true
-        type: string
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/substrate.TxBase'
+            $ref: '#/definitions/substrate.Base'
         "400":
           description: Bad Request
           schema:
             type: string
-      summary: Get tx base
+      summary: Get substrate base
       tags:
       - Substrate
   /substrate/broadcast:
@@ -849,6 +919,42 @@ paths:
       description: calculate fee
       operationId: fee
       parameters:
+      - description: tx
+        in: query
+        name: tx
+        required: true
+        type: string
+      - description: network
+        in: query
+        name: network
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/substrate.FeeInfo'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Calculate fee
+      tags:
+      - Substrate
+  /substrate/transfer/fee:
+    get:
+      consumes:
+      - application/json
+      description: calculate transferFee
+      operationId: transferFee
+      parameters:
+      - description: tx
+        in: query
+        name: tx
+        required: true
+        type: string
       - description: sender
         in: query
         name: sender
@@ -864,11 +970,16 @@ paths:
         name: value
         required: true
         type: string
-      - description: currency
+      - description: network
         in: query
-        name: currency
+        name: network
         required: true
         type: integer
+      - description: isFullBalance
+        in: query
+        name: isFullBalance
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -880,7 +991,38 @@ paths:
           description: Bad Request
           schema:
             type: string
-      summary: Calculate fee
+      summary: Calculate transferFee
+      tags:
+      - Substrate
+  /substrate/txBase:
+    get:
+      consumes:
+      - application/json
+      description: calculate fee
+      operationId: txBase
+      parameters:
+      - description: sender
+        in: query
+        name: sender
+        required: true
+        type: string
+      - description: network
+        in: query
+        name: network
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/substrate.TxBase'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get tx base
       tags:
       - Substrate
 securityDefinitions:

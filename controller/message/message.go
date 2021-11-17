@@ -67,7 +67,7 @@ func (c *Controller) ReturnErr(err error, w http.ResponseWriter) {
 // @Tags Message
 // @Accept  json
 // @Produce json
-// @Success 200 {object} MessagesAndUsersRs
+// @Success 200 {object} MessagesAndTxs
 // @Failure 400 {string} string
 // @Router /message/unread [get]
 func (c *Controller) unread(w http.ResponseWriter, r *http.Request) error {
@@ -204,14 +204,14 @@ func (c *Controller) read(w http.ResponseWriter, r *http.Request) error {
 // sendMsg godoc
 // @Summary send message
 // @Description send message
-// @ID read
+// @ID send
 // @Tags Message
 // @Accept  json
 // @Produce json
 // @Param rq body MessageRq true "send message body"
 // @Success 200 {object} SendInfo
 // @Failure 400 {string} string
-// @Router /message/read [post]
+// @Router /message/send [post]
 func (c *Controller) send(w http.ResponseWriter, r *http.Request) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {

@@ -41,12 +41,6 @@
 }
 ```
 
-5. Run migrations
-```sh
-go run migrations/*.go --config config.release.json init
-go run migrations/*.go --config config.release.json up
-```
-
 ## Run with golang
 
 1. Build
