@@ -1,37 +1,39 @@
 ## Architecture
-Архитерктура имеет несколько главных модулей
+![image info](./architecture.png)
 
-#### fractapp-server который состоит из:
+The architecture has multiple modules
+
+#### fractapp-server consists of:
 ```
-api - хранитель профилей и главный api для клиента  
+api - profile keeper and main api for the client
 ```
 ```
-subscriber - получает данные о новых транзакциях от scanner
+subscriber - receives data about new transactions from scanner
 ```
 ```
-price - сохраняет цену о монете в базу данных
+price - saves the price of a coin to the database
 ``` 
 ```
-scheduler - включается раз в 1 минуту, чтобы отправить уведомления через firebase 
+scheduler - turns on every 1 minute to send notifications through firebase
 ``` 
 
-#### scanner который состоит из:
+#### scanner consists of:
 ```
-api - blockchain api, который отвечает за получение транзакций, информации о транзации и т.д.  
-```
-```
-scanner - сканирует транзакции из блокчейна и записывает в базу данных
+api - blockchain api which is responsible for receiving transactions, information about transactions, etc.
 ```
 ```
-notifier - уведомляет fractapp-server о новых транзациях
+scanner - scans transactions from the blockchain and writes to the database
+```
+```
+notifier - notifies fractapp-server of new transactions
 ``` 
 
-#### staking-bot который состоит из:
+#### staking-bot consists of:
 ```
-cache - кеширует данные из блокчейна, чтобы staking-bot мог их быстро получать
+cache - caches data from the blockchain so that the staking-bot can quickly receive it
 ```
 ```
-bot - сам бот, который отправляет и получает сообщения через fractapp-server api
+bot - staking bot that sends and receives messages via fractapp-server api
 ```
 
 
