@@ -1,5 +1,5 @@
 ## Architecture
-
+[link](https://github.com/fractapp/fractapp-server/blob/main/doc/docs.md)
 
 
 ## Config
