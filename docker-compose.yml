@@ -1,48 +1,28 @@
 version: "3.9"  # optional since v1.27.0
 
-networks:
-  subscriber_network:
-    driver: bridge
-
 services:
-  mongo:
-    image: mongo
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    networks:
-      - subscriber_network
-
   api:
     build:
       context: .
       dockerfile: ./docker/api/Dockerfile
     ports:
       - "9544:9544"
-    networks:
-      - subscriber_network
 
   dot-price:
     build:
       context: .
       dockerfile: ./docker/price/Dockerfile
-      environment:
+    environment:
         currency: "DOT"
         start: 1597622400000
-    networks:
-      - subscriber_network
 
   ksm-price:
     build:
       context: .
       dockerfile: ./docker/price/Dockerfile
-      environment:
+    environment:
         currency: "KSM"
         start: 1599177600000
-    networks:
-      - subscriber_network
 
   subscriber:
     build:
@@ -50,12 +30,16 @@ services:
       dockerfile: ./docker/subscriber/Dockerfile
     ports:
         - "9505:9505"
-    networks:
-      - subscriber_network
 
   scheduler:
     build:
       context: .
       dockerfile: ./docker/scheduler/Dockerfile
-    networks:
-      - subscriber_network
+
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password

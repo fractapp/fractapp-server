@@ -14,3 +14,9 @@ htmlCoverage:
 
 updateSwagger:
 	${GOPATH}/bin/swag init -g cmd/api/main.go
+
+build:
+	mkdir -p bin
+	rm -r bin
+	mkdir -p bin
+	cd bin && go build ../cmd/api && go build ../cmd/price && go build ../cmd/scheduler && go build ../cmd/subscriber
